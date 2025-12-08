@@ -10,6 +10,12 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 
 const KRAKEN_WS_URL: &str = "wss://ws.kraken.com/";
 
+/// Default trading pair for the orderbook visualizer
+pub const DEFAULT_TRADING_PAIR: &str = "ZEC/USD";
+
+/// Default book depth for orderbook subscription
+pub const DEFAULT_BOOK_DEPTH: u32 = 25;
+
 /// WebSocket client for connecting to Kraken API
 pub struct KrakenClient {
     url: String,
@@ -85,6 +91,12 @@ impl KrakenConnection {
             .context("Failed to send subscription request")?;
 
         Ok(())
+    }
+
+    /// Subscribe to the book channel for ZEC/USD pair (default configuration)
+    pub async fn subscribe_zec_usd(&mut self) -> Result<()> {
+        self.subscribe_book(DEFAULT_TRADING_PAIR, Some(DEFAULT_BOOK_DEPTH))
+            .await
     }
 
     /// Receive the next message from the WebSocket
