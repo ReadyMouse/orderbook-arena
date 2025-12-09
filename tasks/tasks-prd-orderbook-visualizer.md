@@ -94,17 +94,17 @@ Based on PRD: `prd-orderbook-visualizer.md`
   - [x] 4.9 Create `frontend/src/utils/format.js` with utility functions for formatting prices and timestamps
   - [x] 4.10 Set up basic `App.jsx` structure with layout for visualization area and controls section
 
-- [ ] 5.0 Frontend: Orderbook Visualization Components
-  - [ ] 5.1 Create `frontend/src/components/OrderbookView.jsx` as main container component
-  - [ ] 5.2 Implement layout with sellers (asks) on left side (red) and buyers (bids) on right side (blue)
-  - [ ] 5.3 Create `frontend/src/components/PriceColumn.jsx` component that takes price and volume props
-  - [ ] 5.4 Implement icon rendering in `PriceColumn.jsx` using emoji 👤, mapping volume to number of icons (start with simple linear mapping)
-  - [ ] 5.5 Create `frontend/src/components/Centerline.jsx` component that displays a vertical line representing last traded price
-  - [ ] 5.6 Implement horizontal positioning logic in `OrderbookView.jsx` to position price columns based on distance from lastPrice
-  - [ ] 5.7 Add framer-motion animation to `Centerline.jsx` for smooth movement when lastPrice updates
-  - [ ] 5.8 Implement trade execution animation in `PriceColumn.jsx` - animate icon pairs "walking off" when volume decreases (use framer-motion exit animations)
-  - [ ] 5.9 Style components with TailwindCSS using 8-bit retro arcade aesthetic (pixelated fonts, retro colors)
-  - [ ] 5.10 Optimize rendering performance by memoizing components and limiting number of price levels displayed if needed
+- [x] 5.0 Frontend: Orderbook Visualization Components
+  - [x] 5.1 Create `frontend/src/components/OrderbookView.jsx` as main container component
+  - [x] 5.2 Implement layout with sellers (asks) on left side (red) and buyers (bids) on right side (blue)
+  - [x] 5.3 Create `frontend/src/components/PriceColumn.jsx` component that takes price and volume props
+  - [x] 5.4 Implement icon rendering in `PriceColumn.jsx` using emoji 👤, mapping volume to number of icons (start with simple linear mapping)
+  - [x] 5.5 Create `frontend/src/components/Centerline.jsx` component that displays a vertical line representing last traded price
+  - [x] 5.6 Implement horizontal positioning logic in `OrderbookView.jsx` to position price columns based on distance from lastPrice
+  - [x] 5.7 Add framer-motion animation to `Centerline.jsx` for smooth movement when lastPrice updates
+  - [x] 5.8 Implement trade execution animation in `PriceColumn.jsx` - animate icon pairs "walking off" when volume decreases (use framer-motion exit animations)
+  - [x] 5.9 Style components with TailwindCSS using 8-bit retro arcade aesthetic (pixelated fonts, retro colors)
+  - [x] 5.10 Optimize rendering performance by memoizing components and limiting number of price levels displayed if needed
 
 - [ ] 6.0 Frontend: Time-Travel Controls and Integration
   - [ ] 6.1 Create `frontend/src/components/TimeSlider.jsx` component with range input for timestamp selection

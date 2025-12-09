@@ -1,4 +1,5 @@
 import { useWebSocket } from './hooks/useWebSocket'
+import OrderbookView from './components/OrderbookView'
 import './App.css'
 
 function App() {
@@ -25,20 +26,8 @@ function App() {
 
       {/* Main visualization area */}
       <main className="flex-1 p-4">
-        <div className="w-full h-[calc(100vh-200px)] border-2 border-arcade-white bg-arcade-dark">
-          {/* Orderbook visualization will go here */}
-          {orderbookState ? (
-            <div className="p-4">
-              <p className="text-arcade-gray">Orderbook data received</p>
-              <p className="text-sm">Last Price: {orderbookState.lastPrice || 'N/A'}</p>
-              <p className="text-sm">Bids: {orderbookState.bids?.length || 0}</p>
-              <p className="text-sm">Asks: {orderbookState.asks?.length || 0}</p>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full">
-              <p className="text-arcade-gray">Waiting for orderbook data...</p>
-            </div>
-          )}
+        <div className="w-full h-[calc(100vh-200px)] border-2 border-arcade-white">
+          <OrderbookView orderbookState={orderbookState} />
         </div>
       </main>
 
