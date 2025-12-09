@@ -70,7 +70,7 @@ Based on PRD: `prd-orderbook-visualizer.md`
   - [x] 2.7 Create `backend/src/config.rs` for configuration management with configurable snapshot interval (default: 5 seconds)
   - [x] 2.8 Integrate snapshot storage with orderbook engine to automatically store snapshots at configured intervals
 
-- [ ] 3.0 Backend: API Server (REST + WebSocket Endpoints)
+- [x] 3.0 Backend: API Server (REST + WebSocket Endpoints)
   - [x] 3.1 Set up Axum server in `backend/src/main.rs` listening on port 8080
   - [x] 3.2 Create `backend/src/api/mod.rs` to organize API modules
   - [x] 3.3 Create `backend/src/api/routes.rs` with REST route handlers
@@ -82,17 +82,17 @@ Based on PRD: `prd-orderbook-visualizer.md`
   - [x] 3.9 Add error handling middleware for API routes to return appropriate HTTP status codes and error messages
   - [x] 3.10 Integrate all routes and WebSocket handler in main.rs
 
-- [ ] 4.0 Frontend: Project Setup and Core Structure
-  - [ ] 4.1 Initialize React project with Vite: `npm create vite@latest frontend -- --template react`
-  - [ ] 4.2 Install dependencies: `npm install framer-motion tailwindcss postcss autoprefixer`
-  - [ ] 4.3 Initialize TailwindCSS: `npx tailwindcss init -p`
-  - [ ] 4.4 Configure `tailwind.config.js` with 8-bit retro arcade theme colors and fonts
-  - [ ] 4.5 Set up TailwindCSS in `frontend/src/index.css` with base styles
-  - [ ] 4.6 Create `frontend/src/utils/api.js` with functions: `fetchSnapshot(timestamp)`, `fetchHistory()`
-  - [ ] 4.7 Create `frontend/src/hooks/useWebSocket.js` custom hook for managing WebSocket connection to `ws://localhost:8080/live`
-  - [ ] 4.8 Implement WebSocket hook with connection management, message parsing, and error state handling
-  - [ ] 4.9 Create `frontend/src/utils/format.js` with utility functions for formatting prices and timestamps
-  - [ ] 4.10 Set up basic `App.jsx` structure with layout for visualization area and controls section
+- [x] 4.0 Frontend: Project Setup and Core Structure
+  - [x] 4.1 Initialize React project with Vite: `npm create vite@latest frontend -- --template react`
+  - [x] 4.2 Install dependencies: `npm install framer-motion tailwindcss postcss autoprefixer`
+  - [x] 4.3 Initialize TailwindCSS: `npx tailwindcss init -p`
+  - [x] 4.4 Configure `tailwind.config.js` with 8-bit retro arcade theme colors and fonts
+  - [x] 4.5 Set up TailwindCSS in `frontend/src/index.css` with base styles
+  - [x] 4.6 Create `frontend/src/utils/api.js` with functions: `fetchSnapshot(timestamp)`, `fetchHistory()`
+  - [x] 4.7 Create `frontend/src/hooks/useWebSocket.js` custom hook for managing WebSocket connection to `ws://localhost:8080/live`
+  - [x] 4.8 Implement WebSocket hook with connection management, message parsing, and error state handling
+  - [x] 4.9 Create `frontend/src/utils/format.js` with utility functions for formatting prices and timestamps
+  - [x] 4.10 Set up basic `App.jsx` structure with layout for visualization area and controls section
 
 - [ ] 5.0 Frontend: Orderbook Visualization Components
   - [ ] 5.1 Create `frontend/src/components/OrderbookView.jsx` as main container component

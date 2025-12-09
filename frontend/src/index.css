@@ -1,0 +1,39 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-arcade-bg text-arcade-white font-arcade;
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    /* Pixelated rendering for retro look */
+    image-rendering: pixelated;
+    image-rendering: -moz-crisp-edges;
+    image-rendering: crisp-edges;
+  }
+
+  * {
+    /* Disable smooth scrolling for retro feel */
+    scroll-behavior: auto;
+  }
+}
+
+@layer components {
+  /* Retro button style */
+  .btn-arcade {
+    @apply bg-arcade-dark text-arcade-white border-2 border-arcade-white;
+    @apply px-4 py-2 font-arcade uppercase;
+    @apply shadow-arcade;
+    @apply transition-all duration-100;
+  }
+
+  .btn-arcade:hover {
+    @apply shadow-arcade-lg translate-x-1 translate-y-1;
+  }
+
+  .btn-arcade:active {
+    @apply shadow-none translate-x-2 translate-y-2;
+  }
+}
