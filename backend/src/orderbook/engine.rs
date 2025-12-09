@@ -1,7 +1,9 @@
 use std::collections::BTreeMap;
 use std::cmp::Ordering;
+use std::time::{SystemTime, UNIX_EPOCH};
 use crate::kraken::types::{BookSnapshot, BookDelta, parse_price_level};
 use anyhow::Result;
+use serde::{Serialize, Deserialize};
 
 /// Wrapper for f64 that implements Ord for use in BTreeMap
 /// Prices in orderbooks are always valid numbers (no NaN), so this is safe
@@ -14,6 +16,23 @@ impl Ord for Price {
     fn cmp(&self, other: &Self) -> Ordering {
         self.0.partial_cmp(&other.0).unwrap_or(Ordering::Equal)
     }
+}
+
+/// Price level entry for JSON serialization
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PriceLevelEntry {
+    pub price: f64,
+    pub volume: f64,
+}
+
+/// Orderbook state response in the required JSON format
+#[derive(Debug, Clone, Serialize)]
+pub struct OrderbookState {
+    pub timestamp: i64,
+    #[serde(rename = "lastPrice")]
+    pub last_price: Option<f64>,
+    pub bids: Vec<PriceLevelEntry>,
+    pub asks: Vec<PriceLevelEntry>,
 }
 
 /// Orderbook engine that maintains the current state of bids and asks
@@ -187,6 +206,47 @@ impl OrderbookEngine {
         }
 
         Ok(())
+    }
+
+    /// Get the current orderbook state in the required JSON format
+    /// 
+    /// Returns orderbook data with:
+    /// - timestamp: Current Unix timestamp
+    /// - lastPrice: Last traded price (if available)
+    /// - bids: Sorted in descending order by price (highest first)
+    /// - asks: Sorted in ascending order by price (lowest first)
+    pub fn get_current_state(&self) -> OrderbookState {
+        // Get current timestamp
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs() as i64;
+
+        // Collect bids in descending order (highest price first)
+        let bids: Vec<PriceLevelEntry> = self.bids
+            .iter()
+            .rev()
+            .map(|(price, volume)| PriceLevelEntry {
+                price: price.0,
+                volume: *volume,
+            })
+            .collect();
+
+        // Collect asks in ascending order (lowest price first)
+        let asks: Vec<PriceLevelEntry> = self.asks
+            .iter()
+            .map(|(price, volume)| PriceLevelEntry {
+                price: price.0,
+                volume: *volume,
+            })
+            .collect();
+
+        OrderbookState {
+            timestamp,
+            last_price: self.last_price,
+            bids,
+            asks,
+        }
     }
 }
 
@@ -651,6 +711,66 @@ mod tests {
         
         // Verify last_price was not changed (no trade detected)
         assert_eq!(engine.last_price(), Some(42000.0));
+    }
+
+    #[test]
+    fn test_get_current_state() {
+        use crate::kraken::types::BookSnapshot;
+        
+        let mut engine = OrderbookEngine::new();
+        
+        // Set initial state
+        let snapshot = BookSnapshot {
+            bids: vec![
+                ["41990.0".to_string(), "2.5".to_string(), "1234567890.0".to_string()],
+                ["41980.0".to_string(), "1.2".to_string(), "1234567890.0".to_string()],
+            ],
+            asks: vec![
+                ["42010.0".to_string(), "3.1".to_string(), "1234567890.0".to_string()],
+                ["42020.0".to_string(), "0.8".to_string(), "1234567890.0".to_string()],
+            ],
+        };
+        engine.apply_snapshot(&snapshot).unwrap();
+        engine.set_last_price(42000.0);
+        
+        // Get current state
+        let state = engine.get_current_state();
+        
+        // Verify timestamp is set (should be recent)
+        assert!(state.timestamp > 0);
+        
+        // Verify last_price is set
+        assert_eq!(state.last_price, Some(42000.0));
+        
+        // Verify bids are in descending order (highest first)
+        assert_eq!(state.bids.len(), 2);
+        assert_eq!(state.bids[0].price, 41990.0);
+        assert_eq!(state.bids[0].volume, 2.5);
+        assert_eq!(state.bids[1].price, 41980.0);
+        assert_eq!(state.bids[1].volume, 1.2);
+        
+        // Verify asks are in ascending order (lowest first)
+        assert_eq!(state.asks.len(), 2);
+        assert_eq!(state.asks[0].price, 42010.0);
+        assert_eq!(state.asks[0].volume, 3.1);
+        assert_eq!(state.asks[1].price, 42020.0);
+        assert_eq!(state.asks[1].volume, 0.8);
+    }
+
+    #[test]
+    fn test_get_current_state_empty_orderbook() {
+        let engine = OrderbookEngine::new();
+        let state = engine.get_current_state();
+        
+        // Verify timestamp is set
+        assert!(state.timestamp > 0);
+        
+        // Verify last_price is None
+        assert_eq!(state.last_price, None);
+        
+        // Verify bids and asks are empty
+        assert_eq!(state.bids.len(), 0);
+        assert_eq!(state.asks.len(), 0);
     }
 }
 

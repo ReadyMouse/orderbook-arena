@@ -48,7 +48,7 @@ Based on PRD: `prd-orderbook-visualizer.md`
 
 ## Tasks
 
-- [ ] 1.0 Backend: Kraken WebSocket Client and Orderbook Engine
+- [x] 1.0 Backend: Kraken WebSocket Client and Orderbook Engine
   - [x] 1.1 Initialize Rust project with `cargo new backend` and configure `Cargo.toml` with dependencies: tokio, tokio-tungstenite, axum, serde, serde_json, anyhow
   - [x] 1.2 Create `backend/src/kraken/types.rs` with data structures for Kraken WebSocket messages (subscription request, snapshot message, delta message)
   - [x] 1.3 Create `backend/src/kraken/client.rs` with WebSocket client that connects to `wss://ws.kraken.com/`
@@ -56,12 +56,12 @@ Based on PRD: `prd-orderbook-visualizer.md`
   - [x] 1.5 Create `backend/src/orderbook/engine.rs` with `OrderbookEngine` struct using BTreeMap for bids (descending) and asks (ascending)
   - [x] 1.6 Implement `apply_snapshot()` method in `OrderbookEngine` to process initial snapshot messages and populate full orderbook state
   - [x] 1.7 Implement `apply_delta()` method in `OrderbookEngine` to process delta messages, update volumes, and remove price levels when volume reaches zero
-  - [ ] 1.8 Add `last_price` field to `OrderbookEngine` and update it when trades are detected in delta messages
-  - [ ] 1.9 Implement `get_current_state()` method that returns orderbook data in the required JSON format with sorted bids/asks
-  - [ ] 1.10 Add error handling for malformed messages and connection failures in `client.rs`
+  - [x] 1.8 Add `last_price` field to `OrderbookEngine` and update it when trades are detected in delta messages
+  - [x] 1.9 Implement `get_current_state()` method that returns orderbook data in the required JSON format with sorted bids/asks
+  - [x] 1.10 Add error handling for malformed messages and connection failures in `client.rs`
 
 - [ ] 2.0 Backend: Snapshot Storage System
-  - [ ] 2.1 Create `backend/src/orderbook/snapshot.rs` with `Snapshot` struct containing timestamp, lastPrice, bids, and asks
+  - [x] 2.1 Create `backend/src/orderbook/snapshot.rs` with `Snapshot` struct containing timestamp, lastPrice, bids, and asks
   - [ ] 2.2 Create `backend/src/orderbook/store.rs` with `SnapshotStore` struct using HashMap or Vec for in-memory storage indexed by timestamp
   - [ ] 2.3 Implement `store_snapshot()` method to save snapshots with timestamp as key
   - [ ] 2.4 Implement `get_snapshot(timestamp)` method to retrieve snapshot by timestamp, returning Option<Snapshot>
