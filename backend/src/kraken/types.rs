@@ -17,6 +17,7 @@ pub struct SubscriptionDetails {
 
 /// Subscription status response from Kraken
 #[derive(Debug, Deserialize)]
+#[allow(non_snake_case)] // errorMessage matches Kraken API format
 pub struct SubscriptionStatus {
     pub event: String,
     pub status: String,

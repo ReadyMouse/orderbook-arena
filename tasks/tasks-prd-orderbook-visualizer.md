@@ -12,6 +12,8 @@ Based on PRD: `prd-orderbook-visualizer.md`
 - `backend/src/kraken/client.rs` - WebSocket client for connecting to Kraken API
 - `backend/src/kraken/mod.rs` - Kraken module organization
 - `backend/src/orderbook/engine.rs` - Orderbook state management using BTreeMap, handles snapshot-delta pattern
+- `backend/src/orderbook/mod.rs` - Orderbook module organization
+- `backend/src/orderbook/engine.rs` - Orderbook state management using BTreeMap, handles snapshot-delta pattern
 - `backend/src/orderbook/snapshot.rs` - Snapshot data structure and storage logic
 - `backend/src/orderbook/store.rs` - In-memory snapshot storage with timestamp indexing and cleanup
 - `backend/src/api/routes.rs` - REST API route handlers (GET /snapshot/{timestamp}, GET /history)
@@ -50,10 +52,10 @@ Based on PRD: `prd-orderbook-visualizer.md`
   - [x] 1.1 Initialize Rust project with `cargo new backend` and configure `Cargo.toml` with dependencies: tokio, tokio-tungstenite, axum, serde, serde_json, anyhow
   - [x] 1.2 Create `backend/src/kraken/types.rs` with data structures for Kraken WebSocket messages (subscription request, snapshot message, delta message)
   - [x] 1.3 Create `backend/src/kraken/client.rs` with WebSocket client that connects to `wss://ws.kraken.com/`
-  - [ ] 1.4 Implement subscription logic in `client.rs` to subscribe to `book` channel for ZEC/USD pair
-  - [ ] 1.5 Create `backend/src/orderbook/engine.rs` with `OrderbookEngine` struct using BTreeMap for bids (descending) and asks (ascending)
-  - [ ] 1.6 Implement `apply_snapshot()` method in `OrderbookEngine` to process initial snapshot messages and populate full orderbook state
-  - [ ] 1.7 Implement `apply_delta()` method in `OrderbookEngine` to process delta messages, update volumes, and remove price levels when volume reaches zero
+  - [x] 1.4 Implement subscription logic in `client.rs` to subscribe to `book` channel for ZEC/USD pair
+  - [x] 1.5 Create `backend/src/orderbook/engine.rs` with `OrderbookEngine` struct using BTreeMap for bids (descending) and asks (ascending)
+  - [x] 1.6 Implement `apply_snapshot()` method in `OrderbookEngine` to process initial snapshot messages and populate full orderbook state
+  - [x] 1.7 Implement `apply_delta()` method in `OrderbookEngine` to process delta messages, update volumes, and remove price levels when volume reaches zero
   - [ ] 1.8 Add `last_price` field to `OrderbookEngine` and update it when trades are detected in delta messages
   - [ ] 1.9 Implement `get_current_state()` method that returns orderbook data in the required JSON format with sorted bids/asks
   - [ ] 1.10 Add error handling for malformed messages and connection failures in `client.rs`

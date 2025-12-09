@@ -11,9 +11,11 @@ use tokio_tungstenite::{connect_async, tungstenite::Message};
 const KRAKEN_WS_URL: &str = "wss://ws.kraken.com/";
 
 /// Default trading pair for the orderbook visualizer
+#[allow(dead_code)] // Will be used when integrating client
 pub const DEFAULT_TRADING_PAIR: &str = "ZEC/USD";
 
 /// Default book depth for orderbook subscription
+#[allow(dead_code)] // Will be used when integrating client
 pub const DEFAULT_BOOK_DEPTH: u32 = 25;
 
 /// WebSocket client for connecting to Kraken API
@@ -160,6 +162,7 @@ pub enum KrakenMessage {
 }
 
 /// Reconnect with exponential backoff
+#[allow(dead_code)] // Will be used in task 7.4 for reconnection logic
 pub async fn reconnect_with_backoff(
     client: &KrakenClient,
     max_retries: usize,
