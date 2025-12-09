@@ -60,7 +60,7 @@ Based on PRD: `prd-orderbook-visualizer.md`
   - [x] 1.9 Implement `get_current_state()` method that returns orderbook data in the required JSON format with sorted bids/asks
   - [x] 1.10 Add error handling for malformed messages and connection failures in `client.rs`
 
-- [ ] 2.0 Backend: Snapshot Storage System
+- [x] 2.0 Backend: Snapshot Storage System
   - [x] 2.1 Create `backend/src/orderbook/snapshot.rs` with `Snapshot` struct containing timestamp, lastPrice, bids, and asks
   - [x] 2.2 Create `backend/src/orderbook/store.rs` with `SnapshotStore` struct using HashMap or Vec for in-memory storage indexed by timestamp
   - [x] 2.3 Implement `store_snapshot()` method to save snapshots with timestamp as key
