@@ -1,5 +1,5 @@
 use serde::{Deserialize, Serialize};
-use crate::orderbook::engine::PriceLevelEntry;
+use crate::orderbook::engine::{PriceLevelEntry, OrderbookState};
 
 /// Snapshot of orderbook state at a specific point in time
 /// 
@@ -34,6 +34,16 @@ impl Snapshot {
             last_price,
             bids,
             asks,
+        }
+    }
+
+    /// Create a snapshot from an OrderbookState
+    pub fn from_orderbook_state(state: OrderbookState) -> Self {
+        Self {
+            timestamp: state.timestamp,
+            last_price: state.last_price,
+            bids: state.bids,
+            asks: state.asks,
         }
     }
 }

@@ -62,13 +62,13 @@ Based on PRD: `prd-orderbook-visualizer.md`
 
 - [ ] 2.0 Backend: Snapshot Storage System
   - [x] 2.1 Create `backend/src/orderbook/snapshot.rs` with `Snapshot` struct containing timestamp, lastPrice, bids, and asks
-  - [ ] 2.2 Create `backend/src/orderbook/store.rs` with `SnapshotStore` struct using HashMap or Vec for in-memory storage indexed by timestamp
-  - [ ] 2.3 Implement `store_snapshot()` method to save snapshots with timestamp as key
-  - [ ] 2.4 Implement `get_snapshot(timestamp)` method to retrieve snapshot by timestamp, returning Option<Snapshot>
-  - [ ] 2.5 Implement `get_history_range()` method that returns min and max timestamps available
-  - [ ] 2.6 Implement cleanup logic to remove snapshots older than 1 hour (run periodically or on each store)
-  - [ ] 2.7 Create `backend/src/config.rs` for configuration management with configurable snapshot interval (default: 5 seconds)
-  - [ ] 2.8 Integrate snapshot storage with orderbook engine to automatically store snapshots at configured intervals
+  - [x] 2.2 Create `backend/src/orderbook/store.rs` with `SnapshotStore` struct using HashMap or Vec for in-memory storage indexed by timestamp
+  - [x] 2.3 Implement `store_snapshot()` method to save snapshots with timestamp as key
+  - [x] 2.4 Implement `get_snapshot(timestamp)` method to retrieve snapshot by timestamp, returning Option<Snapshot>
+  - [x] 2.5 Implement `get_history_range()` method that returns min and max timestamps available
+  - [x] 2.6 Implement cleanup logic to remove snapshots older than 1 hour (run periodically or on each store)
+  - [x] 2.7 Create `backend/src/config.rs` for configuration management with configurable snapshot interval (default: 5 seconds)
+  - [x] 2.8 Integrate snapshot storage with orderbook engine to automatically store snapshots at configured intervals
 
 - [ ] 3.0 Backend: API Server (REST + WebSocket Endpoints)
   - [ ] 3.1 Set up Axum server in `backend/src/main.rs` listening on port 8080
