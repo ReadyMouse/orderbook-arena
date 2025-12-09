@@ -71,16 +71,16 @@ Based on PRD: `prd-orderbook-visualizer.md`
   - [x] 2.8 Integrate snapshot storage with orderbook engine to automatically store snapshots at configured intervals
 
 - [ ] 3.0 Backend: API Server (REST + WebSocket Endpoints)
-  - [ ] 3.1 Set up Axum server in `backend/src/main.rs` listening on port 8080
-  - [ ] 3.2 Create `backend/src/api/mod.rs` to organize API modules
-  - [ ] 3.3 Create `backend/src/api/routes.rs` with REST route handlers
-  - [ ] 3.4 Implement `GET /snapshot/{timestamp}` endpoint that retrieves snapshot by timestamp, returns 404 if not found, validates timestamp format
-  - [ ] 3.5 Implement `GET /history` endpoint that returns JSON with `minTimestamp` and `maxTimestamp` fields
-  - [ ] 3.6 Create `backend/src/api/websocket.rs` with WebSocket handler for `WS /live` endpoint
-  - [ ] 3.7 Implement WebSocket server that accepts connections and streams real-time orderbook updates from the engine
-  - [ ] 3.8 Add CORS middleware to allow frontend connections (if needed for development)
-  - [ ] 3.9 Add error handling middleware for API routes to return appropriate HTTP status codes and error messages
-  - [ ] 3.10 Integrate all routes and WebSocket handler in main.rs
+  - [x] 3.1 Set up Axum server in `backend/src/main.rs` listening on port 8080
+  - [x] 3.2 Create `backend/src/api/mod.rs` to organize API modules
+  - [x] 3.3 Create `backend/src/api/routes.rs` with REST route handlers
+  - [x] 3.4 Implement `GET /snapshot/{timestamp}` endpoint that retrieves snapshot by timestamp, returns 404 if not found, validates timestamp format
+  - [x] 3.5 Implement `GET /history` endpoint that returns JSON with `minTimestamp` and `maxTimestamp` fields
+  - [x] 3.6 Create `backend/src/api/websocket.rs` with WebSocket handler for `WS /live` endpoint
+  - [x] 3.7 Implement WebSocket server that accepts connections and streams real-time orderbook updates from the engine
+  - [x] 3.8 Add CORS middleware to allow frontend connections (if needed for development)
+  - [x] 3.9 Add error handling middleware for API routes to return appropriate HTTP status codes and error messages
+  - [x] 3.10 Integrate all routes and WebSocket handler in main.rs
 
 - [ ] 4.0 Frontend: Project Setup and Core Structure
   - [ ] 4.1 Initialize React project with Vite: `npm create vite@latest frontend -- --template react`
