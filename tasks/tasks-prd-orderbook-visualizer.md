@@ -107,17 +107,17 @@ Based on PRD: `prd-orderbook-visualizer.md`
   - [x] 5.10 Optimize rendering performance by memoizing components and limiting number of price levels displayed if needed
 
 - [ ] 6.0 Frontend: Time-Travel Controls and Integration
-  - [ ] 6.1 Create `frontend/src/components/TimeSlider.jsx` component with range input for timestamp selection
-  - [ ] 6.2 Implement slider that displays current timestamp and allows scrubbing through available time range
-  - [ ] 6.3 Create `frontend/src/components/Controls.jsx` with play, pause, and speed control buttons (0.5x, 1x, 2x, 10x)
-  - [ ] 6.4 Create `frontend/src/hooks/useTimeTravel.js` custom hook for managing time-travel state
-  - [ ] 6.5 Implement time-travel state management: `isTimeTravelMode`, `currentTimestamp`, `playbackSpeed`, `isPlaying`
-  - [ ] 6.6 Implement `fetchHistoricalSnapshot(timestamp)` function that calls API and updates orderbook view
-  - [ ] 6.7 Implement playback logic that steps through snapshots at selected speed when play is active
-  - [ ] 6.8 Add logic to pause live WebSocket updates when time-travel mode is active
-  - [ ] 6.9 Add logic to resume live updates when exiting time-travel mode (returning to live mode)
-  - [ ] 6.10 Integrate time-travel controls with `OrderbookView` to display historical data when in time-travel mode
-  - [ ] 6.11 Handle edge cases: beginning/end of history, missing snapshots, invalid timestamps
+  - [x] 6.1 Create `frontend/src/components/TimeSlider.jsx` component with range input for timestamp selection
+  - [x] 6.2 Implement slider that displays current timestamp and allows scrubbing through available time range
+  - [x] 6.3 Create `frontend/src/components/Controls.jsx` with play, pause, and speed control buttons (0.5x, 1x, 2x, 10x)
+  - [x] 6.4 Create `frontend/src/hooks/useTimeTravel.js` custom hook for managing time-travel state
+  - [x] 6.5 Implement time-travel state management: `isTimeTravelMode`, `currentTimestamp`, `playbackSpeed`, `isPlaying`
+  - [x] 6.6 Implement `fetchHistoricalSnapshot(timestamp)` function that calls API and updates orderbook view
+  - [x] 6.7 Implement playback logic that steps through snapshots at selected speed when play is active
+  - [x] 6.8 Add logic to pause live WebSocket updates when time-travel mode is active
+  - [x] 6.9 Add logic to resume live updates when exiting time-travel mode (returning to live mode)
+  - [x] 6.10 Integrate time-travel controls with `OrderbookView` to display historical data when in time-travel mode
+  - [x] 6.11 Handle edge cases: beginning/end of history, missing snapshots, invalid timestamps
 
 - [ ] 7.0 Error Handling, Reconnection Logic, and Polish
   - [ ] 7.1 Create `frontend/src/components/ErrorMessage.jsx` component for displaying user-friendly error messages

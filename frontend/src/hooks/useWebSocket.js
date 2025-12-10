@@ -4,15 +4,17 @@ const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/live';
 
 /**
  * Custom hook for managing WebSocket connection to the backend
+ * @param {boolean} pauseUpdates - If true, WebSocket messages won't update orderbookState (connection stays alive)
  * @returns {Object} { orderbookState, error, isConnected }
  */
-export function useWebSocket() {
+export function useWebSocket(pauseUpdates = false) {
   const [orderbookState, setOrderbookState] = useState(null);
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
+  const pauseUpdatesRef = useRef(pauseUpdates);
 
   const connect = useCallback(() => {
     try {
@@ -27,6 +29,11 @@ export function useWebSocket() {
       };
 
       ws.onmessage = (event) => {
+        // Don't update state if updates are paused (time-travel mode)
+        if (pauseUpdatesRef.current) {
+          return;
+        }
+        
         try {
           const data = JSON.parse(event.data);
           setOrderbookState(data);
@@ -73,6 +80,11 @@ export function useWebSocket() {
       setIsConnected(false);
     }
   }, []);
+
+  // Update pauseUpdatesRef when pauseUpdates changes
+  useEffect(() => {
+    pauseUpdatesRef.current = pauseUpdates;
+  }, [pauseUpdates]);
 
   useEffect(() => {
     connect();
