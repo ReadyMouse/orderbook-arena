@@ -43,19 +43,25 @@ pub struct PriceLevel {
 }
 
 /// Orderbook snapshot data structure
-/// Kraken sends snapshots as: [channelID, {bids: [...], asks: [...]}, "book-25", "ZEC/USD"]
+/// Kraken sends snapshots as: [channelID, {b: [...], a: [...]}, "book-25", "ZEC/USD"]
+/// Note: "b" = bids, "a" = asks. Either field may be missing in individual messages.
 #[derive(Debug, Deserialize)]
 pub struct BookSnapshot {
-    pub bids: Vec<[String; 3]>, // [price, volume, timestamp]
-    pub asks: Vec<[String; 3]>, // [price, volume, timestamp]
+    #[serde(rename = "b", default)]
+    pub bids: Vec<serde_json::Value>, // Can be [price, volume, timestamp] or [price, volume, timestamp, "r"]
+    #[serde(rename = "a", default)]
+    pub asks: Vec<serde_json::Value>, // Can be [price, volume, timestamp] or [price, volume, timestamp, "r"]
 }
 
 /// Orderbook delta/update data structure
-/// Kraken sends deltas as: [channelID, {bids: [...], asks: [...]}, "book-25", "ZEC/USD"]
+/// Kraken sends deltas as: [channelID, {b: [...], a: [...]}, "book-25", "ZEC/USD"]
+/// Note: "b" = bids, "a" = asks. Either field may be missing in individual messages.
 #[derive(Debug, Deserialize)]
 pub struct BookDelta {
-    pub bids: Vec<[String; 3]>, // [price, volume, timestamp] - volume "0" means remove
-    pub asks: Vec<[String; 3]>, // [price, volume, timestamp] - volume "0" means remove
+    #[serde(rename = "b", default)]
+    pub bids: Vec<serde_json::Value>, // Can be [price, volume, timestamp] or [price, volume, timestamp, "r"] - volume "0" means remove
+    #[serde(rename = "a", default)]
+    pub asks: Vec<serde_json::Value>, // Can be [price, volume, timestamp] or [price, volume, timestamp, "r"] - volume "0" means remove
 }
 
 /// Complete book message (snapshot or delta) as received from Kraken
@@ -102,12 +108,32 @@ impl BookMessage {
     }
 }
 
-/// Helper function to parse price level from Kraken format [price, volume, timestamp]
-pub fn parse_price_level(level: &[String; 3]) -> Result<PriceLevel, anyhow::Error> {
-    let price = level[0].parse::<f64>()?;
-    let volume = level[1].parse::<f64>()?;
-    let timestamp = if !level[2].is_empty() {
-        Some(level[2].parse::<f64>()?)
+/// Helper function to parse price level from Kraken format
+/// Format: [price, volume, timestamp] or [price, volume, timestamp, "r"]
+/// where price and volume are strings, timestamp is a string (can be empty), and "r" is optional
+pub fn parse_price_level(level: &serde_json::Value) -> Result<PriceLevel, anyhow::Error> {
+    let arr = level.as_array()
+        .ok_or_else(|| anyhow::anyhow!("Price level must be an array"))?;
+    
+    if arr.len() < 3 {
+        return Err(anyhow::anyhow!("Price level array must have at least 3 elements"));
+    }
+
+    let price = arr[0].as_str()
+        .ok_or_else(|| anyhow::anyhow!("Price must be a string"))?
+        .parse::<f64>()?;
+    
+    let volume = arr[1].as_str()
+        .ok_or_else(|| anyhow::anyhow!("Volume must be a string"))?
+        .parse::<f64>()?;
+    
+    let timestamp = if arr.len() > 2 {
+        let ts_str = arr[2].as_str().unwrap_or("");
+        if !ts_str.is_empty() {
+            Some(ts_str.parse::<f64>()?)
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -137,7 +163,7 @@ mod tests {
 
     #[test]
     fn test_parse_price_level() {
-        let level = ["42000.5".to_string(), "1.25".to_string(), "1234567890.123".to_string()];
+        let level = serde_json::json!(["42000.5", "1.25", "1234567890.123"]);
         let price_level = parse_price_level(&level).unwrap();
         assert_eq!(price_level.price, 42000.5);
         assert_eq!(price_level.volume, 1.25);
@@ -146,11 +172,20 @@ mod tests {
 
     #[test]
     fn test_parse_price_level_empty_timestamp() {
-        let level = ["42000.5".to_string(), "1.25".to_string(), "".to_string()];
+        let level = serde_json::json!(["42000.5", "1.25", ""]);
         let price_level = parse_price_level(&level).unwrap();
         assert_eq!(price_level.price, 42000.5);
         assert_eq!(price_level.volume, 1.25);
         assert_eq!(price_level.timestamp, None);
+    }
+
+    #[test]
+    fn test_parse_price_level_with_replace_flag() {
+        let level = serde_json::json!(["42000.5", "1.25", "1234567890.123", "r"]);
+        let price_level = parse_price_level(&level).unwrap();
+        assert_eq!(price_level.price, 42000.5);
+        assert_eq!(price_level.volume, 1.25);
+        assert_eq!(price_level.timestamp, Some(1234567890.123));
     }
 
     #[test]

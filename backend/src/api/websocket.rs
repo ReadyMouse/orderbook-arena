@@ -19,12 +19,39 @@ pub async fn handle_websocket(
     ws: WebSocketUpgrade,
     State(state): State<AppState>,
 ) -> Response {
-    ws.on_upgrade(|socket| handle_socket(socket, state))
+    eprintln!("WebSocket upgrade request received for /live endpoint");
+    
+    ws.on_upgrade(|socket| {
+        eprintln!("WebSocket connection upgraded, starting handler");
+        handle_socket(socket, state)
+    })
 }
 
 /// Handle an individual WebSocket connection
 async fn handle_socket(socket: axum::extract::ws::WebSocket, state: AppState) {
+    eprintln!("WebSocket handler started");
     let (mut sender, mut receiver) = socket.split();
+    
+    // Send current state immediately when client connects
+    let current_state = {
+        let engine_guard = state.engine.read().await;
+        engine_guard.get_current_state()
+    };
+    
+    eprintln!("Current orderbook state: {} bids, {} asks", current_state.bids.len(), current_state.asks.len());
+    
+    // Send initial state if orderbook has data
+    if !current_state.bids.is_empty() || !current_state.asks.is_empty() {
+        if let Ok(json) = serde_json::to_string(&current_state) {
+            eprintln!("Sending initial state to client");
+            if let Err(e) = sender.send(Message::Text(json)).await {
+                eprintln!("Error sending initial state: {}", e);
+                return;
+            }
+        }
+    } else {
+        eprintln!("Orderbook is empty, not sending initial state");
+    }
     
     // Subscribe to orderbook updates
     let mut rx = state.orderbook_updates.subscribe();

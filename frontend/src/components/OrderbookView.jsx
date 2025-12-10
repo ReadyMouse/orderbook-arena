@@ -12,6 +12,9 @@ import Centerline from './Centerline';
  */
 
 function OrderbookView({ orderbookState }) {
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
+  // This ensures hooks are always called in the same order
+  
   // Calculate price range and positioning
   const { minPrice, maxPrice, centerPrice } = useMemo(() => {
     if (!orderbookState) {
@@ -43,6 +46,24 @@ function OrderbookView({ orderbookState }) {
     };
   }, [orderbookState]);
 
+  // Extract bids and asks with safe defaults
+  const bids = orderbookState?.bids || [];
+  const asks = orderbookState?.asks || [];
+  const lastPrice = orderbookState?.lastPrice;
+
+  // Limit number of price levels displayed for performance (show top 25 each)
+  // Always call these hooks, even if orderbookState is null
+  const limitedBids = useMemo(() => {
+    if (!Array.isArray(bids)) return [];
+    return bids.slice(0, 25);
+  }, [bids]);
+  
+  const limitedAsks = useMemo(() => {
+    if (!Array.isArray(asks)) return [];
+    return asks.slice(0, 25);
+  }, [asks]);
+
+  // NOW we can do conditional returns after all hooks
   if (!orderbookState) {
     return (
       <div className="flex items-center justify-center h-full text-arcade-gray">
@@ -51,22 +72,23 @@ function OrderbookView({ orderbookState }) {
     );
   }
 
-  const { bids = [], asks = [], lastPrice } = orderbookState;
-
-  // Limit number of price levels displayed for performance (show top 25 each)
-  const limitedBids = useMemo(() => bids.slice(0, 25), [bids]);
-  const limitedAsks = useMemo(() => asks.slice(0, 25), [asks]);
+  // Validate data structure
+  if (!Array.isArray(bids) || !Array.isArray(asks)) {
+    return (
+      <div className="flex items-center justify-center h-full text-arcade-red">
+        Invalid orderbook data structure
+      </div>
+    );
+  }
 
   // Calculate horizontal position for a price level
-  const getPosition = useMemo(() => {
-    return (price) => {
-      if (!minPrice || !maxPrice || minPrice === maxPrice) {
-        return 50; // Center if no range
-      }
-      const priceRange = maxPrice - minPrice;
-      return ((price - minPrice) / priceRange) * 100;
-    };
-  }, [minPrice, maxPrice]);
+  const getPosition = (price) => {
+    if (!minPrice || !maxPrice || minPrice === maxPrice) {
+      return 50; // Center if no range
+    }
+    const priceRange = maxPrice - minPrice;
+    return ((price - minPrice) / priceRange) * 100;
+  };
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-arcade-dark">
@@ -77,6 +99,9 @@ function OrderbookView({ orderbookState }) {
         </div>
         <div className="relative h-full overflow-y-auto">
           {limitedAsks.map((ask, index) => {
+            if (!ask || typeof ask.price !== 'number' || typeof ask.volume !== 'number') {
+              return null;
+            }
             const position = getPosition(ask.price);
             // Position from center (50%) towards left (0%)
             const leftPercent = Math.max(0, 50 - position);
@@ -104,6 +129,9 @@ function OrderbookView({ orderbookState }) {
         </div>
         <div className="relative h-full overflow-y-auto">
           {limitedBids.map((bid, index) => {
+            if (!bid || typeof bid.price !== 'number' || typeof bid.volume !== 'number') {
+              return null;
+            }
             const position = getPosition(bid.price);
             // Position from center (50%) towards right (100%)
             const leftPercent = Math.min(100, 50 + (position - 50));

@@ -53,28 +53,48 @@ async fn main() -> anyhow::Result<()> {
                     loop {
                         match connection.next_message().await {
                             Ok(Some(KrakenMessage::Book(book_msg))) => {
+                                eprintln!("Received book message, channel_id: {:?}", book_msg.channel_id());
                                 // Process book message
                                 if let Some(book_data) = book_msg.book_data() {
+                                    eprintln!("Book data extracted, trying to parse...");
                                     // Try to parse as snapshot first
-                                    if let Ok(snapshot) = parse_book_snapshot(&book_data) {
-                                        let mut engine_guard = engine_for_kraken.write().await;
-                                        if let Err(e) = engine_guard.apply_snapshot(&snapshot) {
-                                            eprintln!("Error applying snapshot: {}", e);
-                                        } else {
-                                            // Broadcast update
-                                            let state = engine_guard.get_current_state();
-                                            let _ = updates_tx_for_kraken.send(state);
+                                    match parse_book_snapshot(&book_data) {
+                                        Ok(snapshot) => {
+                                            eprintln!("Parsed as snapshot: {} bids, {} asks", snapshot.bids.len(), snapshot.asks.len());
+                                            let mut engine_guard = engine_for_kraken.write().await;
+                                            if let Err(e) = engine_guard.apply_snapshot(&snapshot) {
+                                                eprintln!("Error applying snapshot: {}", e);
+                                            } else {
+                                                eprintln!("Snapshot applied successfully, broadcasting update");
+                                                // Broadcast update
+                                                let state = engine_guard.get_current_state();
+                                                let _ = updates_tx_for_kraken.send(state);
+                                            }
                                         }
-                                    } else if let Ok(delta) = parse_book_delta(&book_data) {
-                                        let mut engine_guard = engine_for_kraken.write().await;
-                                        if let Err(e) = engine_guard.apply_delta(&delta) {
-                                            eprintln!("Error applying delta: {}", e);
-                                        } else {
-                                            // Broadcast update
-                                            let state = engine_guard.get_current_state();
-                                            let _ = updates_tx_for_kraken.send(state);
+                                        Err(snapshot_err) => {
+                                            // Try parsing as delta
+                                            match parse_book_delta(&book_data) {
+                                                Ok(delta) => {
+                                                    eprintln!("Parsed as delta: {} bids, {} asks", delta.bids.len(), delta.asks.len());
+                                                    let mut engine_guard = engine_for_kraken.write().await;
+                                                    if let Err(e) = engine_guard.apply_delta(&delta) {
+                                                        eprintln!("Error applying delta: {}", e);
+                                                    } else {
+                                                        eprintln!("Delta applied successfully, broadcasting update");
+                                                        // Broadcast update
+                                                        let state = engine_guard.get_current_state();
+                                                        let _ = updates_tx_for_kraken.send(state);
+                                                    }
+                                                }
+                                                Err(delta_err) => {
+                                                    eprintln!("Failed to parse as snapshot or delta. Snapshot error: {}, Delta error: {}", snapshot_err, delta_err);
+                                                    eprintln!("Book data: {}", serde_json::to_string(&book_data).unwrap_or_default());
+                                                }
+                                            }
                                         }
                                     }
+                                } else {
+                                    eprintln!("No book data extracted from message");
                                 }
                             }
                             Ok(Some(KrakenMessage::SubscriptionStatus(status))) => {
@@ -106,6 +126,7 @@ async fn main() -> anyhow::Result<()> {
     let app_state = AppState {
         snapshot_store,
         orderbook_updates: orderbook_updates_tx,
+        engine: engine.clone(),
     };
     
     // Create router with REST routes and WebSocket handler

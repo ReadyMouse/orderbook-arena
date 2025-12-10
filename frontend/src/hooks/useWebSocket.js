@@ -39,13 +39,24 @@ export function useWebSocket() {
 
       ws.onerror = (err) => {
         console.error('WebSocket error:', err);
-        setError('WebSocket connection error');
+        console.error('WebSocket URL:', WS_URL);
+        console.error('WebSocket readyState:', ws.readyState);
+        setError(`WebSocket connection error (state: ${ws.readyState})`);
         setIsConnected(false);
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
+      ws.onclose = (event) => {
+        console.log('WebSocket disconnected', {
+          code: event.code,
+          reason: event.reason,
+          wasClean: event.wasClean
+        });
         setIsConnected(false);
+        
+        // Don't reconnect if it was a clean close or if we're shutting down
+        if (event.wasClean) {
+          return;
+        }
         
         // Exponential backoff reconnection
         const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 30000);

@@ -39,6 +39,8 @@ build/
 # Logs
 *.log
 logs/
+backend.log
+frontend.log
 
 # Temporary files
 *.tmp
@@ -47,3 +49,4 @@ logs/
 
 ## AI 
 ai-dev-tasks-main/*
+images_movies/*
