@@ -15,6 +15,7 @@ export function useWebSocket(pauseUpdates = false) {
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const pauseUpdatesRef = useRef(pauseUpdates);
+  const lastValidStateRef = useRef(null); // Keep last valid state to prevent flashing
 
   const connect = useCallback(() => {
     try {
@@ -36,6 +37,10 @@ export function useWebSocket(pauseUpdates = false) {
         
         try {
           const data = JSON.parse(event.data);
+          // Store valid state in ref to preserve it during disconnects
+          if (data && (data.bids || data.asks)) {
+            lastValidStateRef.current = data;
+          }
           setOrderbookState(data);
           setError(null);
         } catch (err) {
@@ -59,6 +64,9 @@ export function useWebSocket(pauseUpdates = false) {
           wasClean: event.wasClean
         });
         setIsConnected(false);
+        
+        // Don't clear orderbookState on disconnect - keep last valid state to prevent flashing
+        // The state will update when reconnected and new data arrives
         
         // Don't reconnect if it was a clean close or if we're shutting down
         if (event.wasClean) {
@@ -99,6 +107,9 @@ export function useWebSocket(pauseUpdates = false) {
     };
   }, [connect]);
 
-  return { orderbookState, error, isConnected };
+  // Return last valid state if current state is null (to prevent flashing during reconnects)
+  const displayState = orderbookState || lastValidStateRef.current;
+  
+  return { orderbookState: displayState, error, isConnected };
 }
 
