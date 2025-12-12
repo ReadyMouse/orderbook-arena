@@ -26,7 +26,7 @@ impl Config {
             snapshot_interval_secs: 5,
             port: 8080,
             trading_pair: "ZEC/USD".to_string(),
-            book_depth: 25,
+            book_depth: 1000,
             snapshot_retention_secs: 3600, // 1 hour
         }
     }

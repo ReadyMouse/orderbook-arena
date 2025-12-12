@@ -141,7 +141,7 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, deviationTh
             <div className="absolute top-0 bottom-0 w-0.5 bg-arcade-yellow" />
             {/* Current price label */}
             <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 whitespace-nowrap">
-              <div className="bg-arcade-yellow text-arcade-bg px-2 py-1 text-xs font-arcade font-bold">
+              <div className="bg-arcade-yellow text-arcade-bg px-2 py-1 text-sm font-arcade font-bold">
                 {lastPrice.toFixed(2)}
               </div>
             </div>
@@ -175,7 +175,7 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, deviationTh
               
               {/* Price label below the line */}
               <div
-                className={`absolute left-1/2 transform -translate-x-1/2 text-[10px] font-arcade ${labelColor} whitespace-nowrap`}
+                className={`absolute left-1/2 transform -translate-x-1/2 text-sm font-arcade ${labelColor} whitespace-nowrap`}
                 style={{ top: `${notchHeight + 4}px` }}
               >
                 ${tick.price.toFixed(0)}
@@ -187,10 +187,10 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, deviationTh
         {/* Side labels */}
         {ticks.length > 0 && (
           <>
-            <div className="absolute left-2 top-1 text-[10px] font-arcade uppercase text-arcade-blue whitespace-nowrap">
+            <div className="absolute left-2 top-1 text-xs font-arcade uppercase text-arcade-blue whitespace-nowrap">
               BUYERS
             </div>
-            <div className="absolute right-2 top-1 text-[10px] font-arcade uppercase text-arcade-red whitespace-nowrap">
+            <div className="absolute right-2 top-1 text-xs font-arcade uppercase text-arcade-red whitespace-nowrap">
               SELLERS
             </div>
           </>

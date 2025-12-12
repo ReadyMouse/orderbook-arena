@@ -16,6 +16,8 @@ export function useWebSocket(pauseUpdates = false) {
   const reconnectAttemptsRef = useRef(0);
   const pauseUpdatesRef = useRef(pauseUpdates);
   const lastValidStateRef = useRef(null); // Keep last valid state to prevent flashing
+  const accumulatedOrderbookRef = useRef({ bids: new Map(), asks: new Map(), lastPrice: null, timestamp: null }); // Accumulate full orderbook
+  const isFirstMessageRef = useRef(true); // Track if this is the first message after connection
 
   const connect = useCallback(() => {
     try {
@@ -27,6 +29,10 @@ export function useWebSocket(pauseUpdates = false) {
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
+        // Reset accumulated orderbook on new connection
+        accumulatedOrderbookRef.current = { bids: new Map(), asks: new Map(), lastPrice: null, timestamp: null };
+        // First message after connection is always a full snapshot
+        isFirstMessageRef.current = true;
       };
 
       ws.onmessage = (event) => {
@@ -37,12 +43,99 @@ export function useWebSocket(pauseUpdates = false) {
         
         try {
           const data = JSON.parse(event.data);
-          // Store valid state in ref to preserve it during disconnects
+          
           if (data && (data.bids || data.asks)) {
-            lastValidStateRef.current = data;
+            const accumulated = accumulatedOrderbookRef.current;
+            const incomingOrderCount = (data.bids?.length || 0) + (data.asks?.length || 0);
+            
+            // First message after connection is ALWAYS a full snapshot from the backend
+            // All subsequent messages are deltas
+            console.log('Processing message:', { 
+              isFirst: isFirstMessageRef.current, 
+              bids: data.bids?.length || 0, 
+              asks: data.asks?.length || 0, 
+              total: incomingOrderCount,
+              currentBids: accumulated.bids.size,
+              currentAsks: accumulated.asks.size
+            });
+            
+            if (isFirstMessageRef.current) {
+              // Full snapshot: REPLACE the accumulated state
+              console.log('Received initial full snapshot:', { bids: data.bids?.length || 0, asks: data.asks?.length || 0, total: incomingOrderCount });
+              accumulated.bids.clear();
+              accumulated.asks.clear();
+              
+              // Populate from snapshot
+              if (Array.isArray(data.bids)) {
+                data.bids.forEach(bid => {
+                  if (bid && typeof bid.price === 'number' && bid.volume > 0) {
+                    accumulated.bids.set(bid.price, bid.volume);
+                  }
+                });
+              }
+              
+              if (Array.isArray(data.asks)) {
+                data.asks.forEach(ask => {
+                  if (ask && typeof ask.price === 'number' && ask.volume > 0) {
+                    accumulated.asks.set(ask.price, ask.volume);
+                  }
+                });
+              }
+              
+              isFirstMessageRef.current = false;
+            } else {
+              // Delta update: MERGE into accumulated state
+              if (Array.isArray(data.bids)) {
+                data.bids.forEach(bid => {
+                  if (bid && typeof bid.price === 'number') {
+                    if (bid.volume > 0) {
+                      accumulated.bids.set(bid.price, bid.volume);
+                    } else {
+                      // Volume 0 means remove this price level
+                      accumulated.bids.delete(bid.price);
+                    }
+                  }
+                });
+              }
+              
+              if (Array.isArray(data.asks)) {
+                data.asks.forEach(ask => {
+                  if (ask && typeof ask.price === 'number') {
+                    if (ask.volume > 0) {
+                      accumulated.asks.set(ask.price, ask.volume);
+                    } else {
+                      // Volume 0 means remove this price level
+                      accumulated.asks.delete(ask.price);
+                    }
+                  }
+                });
+              }
+            }
+            
+            // Update lastPrice and timestamp
+            if (data.lastPrice != null) {
+              accumulated.lastPrice = data.lastPrice;
+            }
+            if (data.timestamp != null) {
+              accumulated.timestamp = data.timestamp;
+            }
+            
+            // Convert accumulated Maps back to arrays for state
+            const fullState = {
+              bids: Array.from(accumulated.bids.entries())
+                .map(([price, volume]) => ({ price, volume }))
+                .sort((a, b) => b.price - a.price), // Descending for bids
+              asks: Array.from(accumulated.asks.entries())
+                .map(([price, volume]) => ({ price, volume }))
+                .sort((a, b) => a.price - b.price), // Ascending for asks
+              lastPrice: accumulated.lastPrice,
+              timestamp: accumulated.timestamp,
+            };
+            
+            lastValidStateRef.current = fullState;
+            setOrderbookState(fullState);
+            setError(null);
           }
-          setOrderbookState(data);
-          setError(null);
         } catch (err) {
           console.error('Error parsing WebSocket message:', err);
           setError('Failed to parse orderbook update');

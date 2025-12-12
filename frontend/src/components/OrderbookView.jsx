@@ -1,6 +1,4 @@
-import { useMemo, useCallback, memo } from 'react';
-import PriceColumn from './PriceColumn';
-import Centerline from './Centerline';
+import { useMemo, useCallback, memo, useRef } from 'react';
 import PriceScale from './PriceScale';
 
 /**
@@ -51,6 +49,18 @@ function OrderbookView({ orderbookState }) {
   const bids = orderbookState?.bids || [];
   const asks = orderbookState?.asks || [];
   const lastPrice = orderbookState?.lastPrice;
+  
+  // Debug: Log the full orderbook data to see what we're receiving
+  if (process.env.NODE_ENV === 'development' && orderbookState) {
+    console.log('Full orderbook state received:', {
+      bidsCount: bids.length,
+      asksCount: asks.length,
+      allBids: bids,
+      allAsks: asks,
+      lastPrice,
+      timestamp: orderbookState.timestamp,
+    });
+  }
   
   // Fallback: if lastPrice is null but we have price data, use midpoint or first available price
   const effectiveLastPrice = useMemo(() => {
@@ -190,6 +200,130 @@ function OrderbookView({ orderbookState }) {
     return groups.sort((a, b) => a.position - b.position);
   }, [allPriceLevels, getPositionFromCenter, effectiveLastPrice, minPrice, maxPrice]);
 
+  // Create a stable string representation of bids/asks to detect actual changes
+  const bidsAsksKey = useMemo(() => {
+    if (!Array.isArray(bids) || !Array.isArray(asks)) return '';
+    // Create a simple hash based on length and first/last prices to detect meaningful changes
+    const bidsKey = bids.length > 0 ? `${bids.length}-${bids[0]?.price}-${bids[bids.length - 1]?.price}` : '0';
+    const asksKey = asks.length > 0 ? `${asks.length}-${asks[0]?.price}-${asks[asks.length - 1]?.price}` : '0';
+    return `${bidsKey}|${asksKey}`;
+  }, [bids, asks]);
+
+  // Calculate volume for each $10 price interval using ALL orders (not just limited)
+  // Uses the same positioning logic as field lines to align with price scale
+  const intervalVolumes = useMemo(() => {
+    if (!effectiveLastPrice || !minPrice || !maxPrice || minPrice === maxPrice) {
+      return new Map();
+    }
+
+    // Use full bids and asks arrays, not limited ones
+    if (!Array.isArray(bids) || !Array.isArray(asks)) {
+      return new Map();
+    }
+
+    const increment = 10;
+    const roundedCenter = Math.round(effectiveLastPrice / increment) * increment;
+    
+    // Use the SAME calculation as field lines to ensure alignment
+    const leftRange = effectiveLastPrice - minPrice;
+    const rightRange = maxPrice - effectiveLastPrice;
+    const maxRange = Math.max(leftRange, rightRange);
+    const incrementsPerSide = Math.max(5, Math.ceil(maxRange / increment) + 2);
+    
+    const scaleMin = roundedCenter - (incrementsPerSide * increment);
+    const scaleMax = roundedCenter + (incrementsPerSide * increment);
+    const totalRange = scaleMax - scaleMin;
+    
+    const priceToPosition = (price) => {
+      if (totalRange === 0) return 50;
+      return ((price - scaleMin) / totalRange) * 100;
+    };
+
+    // Generate intervals at fixed $10 increments (matching field lines)
+    const volumes = new Map();
+    
+    // Debug: log the range we're checking
+    if (process.env.NODE_ENV === 'development') {
+      // Find actual min/max from all orders
+      const allPrices = [
+        ...bids.map(b => b.price),
+        ...asks.map(a => a.price)
+      ];
+      const actualMin = allPrices.length > 0 ? Math.min(...allPrices) : null;
+      const actualMax = allPrices.length > 0 ? Math.max(...allPrices) : null;
+      
+      console.log('Interval calculation:', {
+        scaleMin,
+        scaleMax,
+        minPrice,
+        maxPrice,
+        roundedCenter,
+        bidsCount: bids.length,
+        asksCount: asks.length,
+        actualMinPrice: actualMin,
+        actualMaxPrice: actualMax,
+        priceRange: actualMin && actualMax ? (actualMax - actualMin).toFixed(2) : null,
+      });
+    }
+    
+    for (let price = scaleMin; price <= scaleMax; price += increment) {
+      const roundedPrice = Math.round(price * 100) / 100;
+      // Don't skip center interval - we want to show volume there too
+      // The center line will still be drawn separately
+      
+      const intervalStart = roundedPrice;
+      const intervalEnd = roundedPrice + increment;
+      
+      // Aggregate volume from ALL bids and asks in this interval
+      let totalVolume = 0;
+      let matchedBids = 0;
+      let matchedAsks = 0;
+      
+      // Check all bids
+      bids.forEach((bid) => {
+        if (bid && typeof bid.price === 'number' && typeof bid.volume === 'number') {
+          if (bid.price >= intervalStart && bid.price < intervalEnd) {
+            totalVolume += bid.volume;
+            matchedBids++;
+          }
+        }
+      });
+      
+      // Check all asks
+      asks.forEach((ask) => {
+        if (ask && typeof ask.price === 'number' && typeof ask.volume === 'number') {
+          if (ask.price >= intervalStart && ask.price < intervalEnd) {
+            totalVolume += ask.volume;
+            matchedAsks++;
+          }
+        }
+      });
+      
+      // Include interval if it has volume
+      if (totalVolume > 0) {
+        const position = priceToPosition(roundedPrice);
+        volumes.set(roundedPrice, {
+          volume: totalVolume,
+          position: position,
+          isLeft: roundedPrice < roundedCenter,
+        });
+        
+        // Debug log for intervals with volume
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Interval ${intervalStart}-${intervalEnd}: volume=${totalVolume.toFixed(4)}, bids=${matchedBids}, asks=${matchedAsks}, position=${position.toFixed(2)}%, roundedPrice=${roundedPrice}, scaleMin=${scaleMin}, scaleMax=${scaleMax}, totalRange=${totalRange}`);
+        }
+      }
+    }
+    
+    return volumes;
+  }, [effectiveLastPrice, minPrice, maxPrice, bidsAsksKey, bids, asks]);
+
+  // Memoize sorted entries for stable rendering
+  const sortedIntervalEntries = useMemo(() => {
+    if (intervalVolumes.size === 0) return [];
+    return Array.from(intervalVolumes.entries()).sort((a, b) => a[0] - b[0]);
+  }, [intervalVolumes]);
+
   // NOW we can do conditional returns after all hooks
   if (!orderbookState) {
     return (
@@ -289,27 +423,75 @@ function OrderbookView({ orderbookState }) {
             }
           }
           
-          return fieldLines.map((line, index) => {
-            if (line.isCenter) {
+          return (
+            <>
+              {/* Field lines */}
+              {fieldLines.map((line, index) => {
+                if (line.isCenter) {
+                  return (
+                    <div
+                      key="center-line"
+                      className="absolute top-0 bottom-0 w-0.5 bg-arcade-yellow/40 z-5"
+                      style={{ left: '50%', transform: 'translateX(-50%)' }}
+                    />
+                  );
+                }
+                
+                const lineColor = line.isLeft ? 'bg-arcade-blue/15' : 'bg-arcade-red/15';
+                return (
+                  <div
+                    key={`field-line-${line.price}`}
+                    className={`absolute top-0 bottom-0 w-px ${lineColor} pointer-events-none z-5`}
+                    style={{ left: `${line.position}%`, transform: 'translateX(-50%)' }}
+                  />
+                );
+              })}
+            </>
+          );
+        })()}
+        
+        {/* Volume icon columns - aligned with price scale ticks */}
+        {effectiveLastPrice && minPrice && maxPrice && sortedIntervalEntries.length > 0 && (
+          <>
+            {sortedIntervalEntries.map(([price, { volume, position, isLeft }]) => {
+              // Calculate number of icons based on volume (same formula as PriceColumn)
+              const iconCount = Math.min(Math.floor(volume * 10), 100);
+              
+              // Use price as key for stability
+              const columnKey = `volume-column-${price.toFixed(0)}`;
+              
+              // Debug log for rendering
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`Rendering column at price ${price}, position ${position.toFixed(2)}%, volume ${volume.toFixed(4)}, icons ${iconCount}`);
+              }
+              
               return (
                 <div
-                  key="center-line"
-                  className="absolute top-0 bottom-0 w-0.5 bg-arcade-yellow/40 z-5"
-                  style={{ left: '50%', transform: 'translateX(-50%)' }}
-                />
+                  key={columnKey}
+                  className="absolute top-0 pointer-events-none z-15"
+                  style={{ 
+                    left: `${position}%`, 
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  {/* Stack icons vertically in a column */}
+                  <div className="flex flex-col items-center gap-0.5">
+                    {Array.from({ length: iconCount }).map((_, i) => (
+                      <span
+                        key={`${columnKey}-icon-${i}`}
+                        className="text-base inline-block leading-none"
+                        role="img"
+                        aria-label="person"
+                      >
+                        👤
+                      </span>
+                    ))}
+                  </div>
+                </div>
               );
-            }
-            
-            const lineColor = line.isLeft ? 'bg-arcade-blue/15' : 'bg-arcade-red/15';
-            return (
-              <div
-                key={`field-line-${line.price}`}
-                className={`absolute top-0 bottom-0 w-px ${lineColor} pointer-events-none z-5`}
-                style={{ left: `${line.position}%`, transform: 'translateX(-50%)' }}
-              />
-            );
-          });
-        })()}
+            })}
+          </>
+        )}
         
         {/* Center line (yard line 50) - prominent */}
         {effectiveLastPrice && (
@@ -318,37 +500,6 @@ function OrderbookView({ orderbookState }) {
             style={{ left: '50%', transform: 'translateX(-50%)' }}
           />
         )}
-        
-        {/* Render all price levels as "players" on the field */}
-        {groupedLevels.map((group, groupIndex) => {
-          return group.levels.map((level, levelIndex) => {
-            const isLeft = level.isBuyer; // Buyers on left, sellers on right
-            const position = group.position;
-            
-            // Stack vertically within the same price group
-            // Each PriceColumn is roughly 120-150px tall depending on volume
-            // Start from top and stack down
-            const verticalOffset = levelIndex * 120;
-            
-            return (
-              <div
-                key={`${level.side}-${level.price}-${levelIndex}`}
-                className="absolute z-20"
-                style={{
-                  left: `${position}%`,
-                  top: `${verticalOffset}px`,
-                  transform: 'translateX(-50%)', // Center the player group on the position
-                }}
-              >
-                <PriceColumn 
-                  price={level.price} 
-                  volume={level.volume} 
-                  side={level.side}
-                />
-              </div>
-            );
-          });
-        }).flat()}
       </div>
     </div>
   );
