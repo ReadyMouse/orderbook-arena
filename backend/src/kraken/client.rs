@@ -15,8 +15,10 @@ const KRAKEN_WS_URL: &str = "wss://ws.kraken.com/";
 pub const DEFAULT_TRADING_PAIR: &str = "ZEC/USD";
 
 /// Default book depth for orderbook subscription
+/// Kraken supports: 10, 25, 100, 500, 1000
+/// Using maximum depth for full orderbook visibility
 #[allow(dead_code)] // Will be used when integrating client
-pub const DEFAULT_BOOK_DEPTH: u32 = 25;
+pub const DEFAULT_BOOK_DEPTH: u32 = 1000;
 
 /// WebSocket client for connecting to Kraken API
 pub struct KrakenClient {

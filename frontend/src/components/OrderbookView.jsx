@@ -1,5 +1,7 @@
 import { useMemo, useCallback, memo, useRef, useState, useEffect } from 'react';
 import PriceScale from './PriceScale';
+import pacManIcon from '../assets/pac-man.png';
+import spaceInvaderIcon from '../assets/space_invader.png';
 
 /**
  * Main container component for the orderbook visualization
@@ -517,14 +519,21 @@ function OrderbookView({ orderbookState }) {
                   {/* Center icons vertically around the midline, like football players on line of scrimmage */}
                   <div className="flex flex-col items-center justify-center gap-0.5">
                     {Array.from({ length: iconCount }).map((_, i) => (
-                      <span
-                        key={`${columnKey}-icon-${i}`}
-                        className="text-base inline-block leading-none"
-                        role="img"
-                        aria-label="person"
-                      >
-                        👤
-                      </span>
+                      isLeft ? (
+                        <img
+                          key={`${columnKey}-icon-${i}`}
+                          src={pacManIcon}
+                          alt="buyer"
+                          className="w-4 h-4 inline-block"
+                        />
+                      ) : (
+                        <img
+                          key={`${columnKey}-icon-${i}`}
+                          src={spaceInvaderIcon}
+                          alt="seller"
+                          className="w-4 h-4 inline-block"
+                        />
+                      )
                     ))}
                   </div>
                 </div>
@@ -545,9 +554,18 @@ function OrderbookView({ orderbookState }) {
       {/* Legend - lower left corner */}
       {volumePerIcon > 0 && (
         <div className="flex-shrink-0 px-4 py-2 bg-arcade-dark">
-          <div className="text-xs font-arcade text-arcade-gray flex items-center gap-2">
-            <span className="text-base" role="img" aria-label="person">👤</span>
-            <span>= {volumePerIcon >= 1 ? volumePerIcon.toFixed(2) : volumePerIcon.toFixed(4)} volume</span>
+          <div className="text-xs font-arcade text-arcade-gray flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <img src={pacManIcon} alt="buyer" className="w-4 h-4" />
+              <span className="text-arcade-blue">Buyers</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <img src={spaceInvaderIcon} alt="seller" className="w-4 h-4" />
+              <span className="text-arcade-red">Sellers</span>
+            </div>
+            <div className="border-l border-arcade-gray/30 pl-4">
+              <span>Each icon = {volumePerIcon >= 1 ? volumePerIcon.toFixed(2) : volumePerIcon.toFixed(4)} volume</span>
+            </div>
           </div>
         </div>
       )}
