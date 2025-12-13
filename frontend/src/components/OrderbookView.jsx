@@ -1,4 +1,4 @@
-import { useMemo, useCallback, memo, useRef } from 'react';
+import { useMemo, useCallback, memo, useRef, useState, useEffect } from 'react';
 import PriceScale from './PriceScale';
 
 /**
@@ -13,6 +13,30 @@ import PriceScale from './PriceScale';
 function OrderbookView({ orderbookState }) {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // This ensures hooks are always called in the same order
+  
+  // Ref for measuring arena height for dynamic scaling
+  const arenaRef = useRef(null);
+  const [arenaHeight, setArenaHeight] = useState(600); // Default height
+  
+  // Measure arena height on mount and resize
+  useEffect(() => {
+    if (!arenaRef.current) return;
+    
+    const updateHeight = () => {
+      if (arenaRef.current) {
+        setArenaHeight(arenaRef.current.clientHeight);
+      }
+    };
+    
+    // Initial measurement
+    updateHeight();
+    
+    // Update on resize
+    const resizeObserver = new ResizeObserver(updateHeight);
+    resizeObserver.observe(arenaRef.current);
+    
+    return () => resizeObserver.disconnect();
+  }, []);
   
   // Calculate price range and positioning
   const { minPrice, maxPrice, centerPrice } = useMemo(() => {
@@ -324,6 +348,35 @@ function OrderbookView({ orderbookState }) {
     return Array.from(intervalVolumes.entries()).sort((a, b) => a[0] - b[0]);
   }, [intervalVolumes]);
 
+  // Calculate dynamic scale based on max volume and available height
+  const { maxVolume, volumePerIcon, maxIconCount } = useMemo(() => {
+    if (sortedIntervalEntries.length === 0 || arenaHeight === 0) {
+      return { maxVolume: 0, volumePerIcon: 0.1, maxIconCount: 0 };
+    }
+    
+    // Find maximum volume across all intervals
+    const max = Math.max(...sortedIntervalEntries.map(([_, data]) => data.volume));
+    
+    // Calculate how many icons can fit vertically (accounting for icon size and gap)
+    // Each icon is ~16px tall (text-base) + 2px gap (gap-0.5) = ~18px per icon
+    // Leave some padding at top/bottom (~40px total)
+    const iconHeight = 18; // pixels per icon including gap
+    const padding = 40;
+    const availableHeight = Math.max(arenaHeight - padding, 200); // Minimum 200px
+    const maxIcons = Math.floor(availableHeight / iconHeight);
+    
+    // Calculate volume per icon so that max volume fills ~70% of available space
+    // This leaves some headroom and prevents touching the top
+    const targetMaxIcons = Math.max(Math.floor(maxIcons * 0.7), 10); // At least 10 icons for max
+    const volPerIcon = max > 0 ? max / targetMaxIcons : 0.1;
+    
+    return {
+      maxVolume: max,
+      volumePerIcon: volPerIcon,
+      maxIconCount: targetMaxIcons,
+    };
+  }, [sortedIntervalEntries, arenaHeight]);
+
   // NOW we can do conditional returns after all hooks
   if (!orderbookState) {
     return (
@@ -361,21 +414,7 @@ function OrderbookView({ orderbookState }) {
       </div>
       
       {/* Football Field - unified visualization area */}
-      <div className="relative flex-1 overflow-auto bg-arcade-dark">
-        {/* Debug info - remove in production */}
-        {process.env.NODE_ENV === 'development' && (
-          <div className="absolute top-2 left-2 text-xs text-arcade-gray z-50 bg-arcade-dark/80 p-2">
-            <div>lastPrice: {lastPrice?.toFixed(2) || 'null'}</div>
-            <div>effectiveLastPrice: {effectiveLastPrice?.toFixed(2) || 'null'}</div>
-            <div>minPrice: {minPrice?.toFixed(2) || 'null'}</div>
-            <div>maxPrice: {maxPrice?.toFixed(2) || 'null'}</div>
-            <div>bids: {bids.length}</div>
-            <div>asks: {asks.length}</div>
-            <div>groupedLevels: {groupedLevels.length}</div>
-            <div>allPriceLevels: {allPriceLevels.length}</div>
-          </div>
-        )}
-        
+      <div ref={arenaRef} className="relative flex-1 overflow-auto bg-arcade-dark">
         {/* Show message if no data */}
         {(!effectiveLastPrice || !minPrice || !maxPrice || minPrice === maxPrice || groupedLevels.length === 0) && (
           <div className="absolute inset-0 flex items-center justify-center z-30">
@@ -451,31 +490,32 @@ function OrderbookView({ orderbookState }) {
         })()}
         
         {/* Volume icon columns - aligned with price scale ticks */}
-        {effectiveLastPrice && minPrice && maxPrice && sortedIntervalEntries.length > 0 && (
+        {effectiveLastPrice && minPrice && maxPrice && sortedIntervalEntries.length > 0 && volumePerIcon > 0 && (
           <>
             {sortedIntervalEntries.map(([price, { volume, position, isLeft }]) => {
-              // Calculate number of icons based on volume (same formula as PriceColumn)
-              const iconCount = Math.min(Math.floor(volume * 10), 100);
+              // Calculate number of icons based on dynamic scale
+              const iconCount = Math.max(1, Math.floor(volume / volumePerIcon));
               
               // Use price as key for stability
               const columnKey = `volume-column-${price.toFixed(0)}`;
               
               // Debug log for rendering
               if (process.env.NODE_ENV === 'development') {
-                console.log(`Rendering column at price ${price}, position ${position.toFixed(2)}%, volume ${volume.toFixed(4)}, icons ${iconCount}`);
+                console.log(`Rendering column at price ${price}, position ${position.toFixed(2)}%, volume ${volume.toFixed(4)}, icons ${iconCount}, volumePerIcon ${volumePerIcon.toFixed(4)}`);
               }
               
               return (
                 <div
                   key={columnKey}
-                  className="absolute top-0 pointer-events-none z-15"
+                  className="absolute pointer-events-none z-15"
                   style={{ 
-                    left: `${position}%`, 
-                    transform: 'translateX(-50%)',
+                    left: `${position}%`,
+                    top: '50%',
+                    transform: 'translate(-50%, -50%)',
                   }}
                 >
-                  {/* Stack icons vertically in a column */}
-                  <div className="flex flex-col items-center gap-0.5">
+                  {/* Center icons vertically around the midline, like football players on line of scrimmage */}
+                  <div className="flex flex-col items-center justify-center gap-0.5">
                     {Array.from({ length: iconCount }).map((_, i) => (
                       <span
                         key={`${columnKey}-icon-${i}`}
@@ -501,6 +541,16 @@ function OrderbookView({ orderbookState }) {
           />
         )}
       </div>
+      
+      {/* Legend - lower left corner */}
+      {volumePerIcon > 0 && (
+        <div className="flex-shrink-0 px-4 py-2 bg-arcade-dark">
+          <div className="text-xs font-arcade text-arcade-gray flex items-center gap-2">
+            <span className="text-base" role="img" aria-label="person">👤</span>
+            <span>= {volumePerIcon >= 1 ? volumePerIcon.toFixed(2) : volumePerIcon.toFixed(4)} volume</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
