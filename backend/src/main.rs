@@ -45,38 +45,47 @@ fn start_kraken_task(ticker: String, ticker_data: TickerData, book_depth: u32) {
                         continue;
                     }
                     
+                    // Track if we've received the initial snapshot
+                    // Kraken sends a full snapshot as the first message, then deltas
+                    let mut received_initial_snapshot = false;
+                    
                     // Process messages
                     loop {
                         match connection.next_message().await {
                             Ok(Some(KrakenMessage::Book(book_msg))) => {
                                 if let Some(book_data) = book_msg.book_data() {
-                                    // Try to parse as snapshot first
-                                    match parse_book_snapshot(&book_data) {
-                                        Ok(snapshot) => {
-                                            eprintln!("[{}] Parsed as snapshot: {} bids, {} asks", ticker, snapshot.bids.len(), snapshot.asks.len());
-                                            let mut engine_guard = ticker_data.engine.write().await;
-                                            if let Err(e) = engine_guard.apply_snapshot(&snapshot) {
-                                                eprintln!("[{}] Error applying snapshot: {}", ticker, e);
-                                            } else {
-                                                let state = engine_guard.get_current_state();
-                                                let _ = ticker_data.orderbook_updates.send(state);
+                                    if !received_initial_snapshot {
+                                        // First message: treat as full snapshot
+                                        match parse_book_snapshot(&book_data) {
+                                            Ok(snapshot) => {
+                                                eprintln!("[{}] Received initial snapshot: {} bids, {} asks", ticker, snapshot.bids.len(), snapshot.asks.len());
+                                                let mut engine_guard = ticker_data.engine.write().await;
+                                                if let Err(e) = engine_guard.apply_snapshot(&snapshot) {
+                                                    eprintln!("[{}] Error applying snapshot: {}", ticker, e);
+                                                } else {
+                                                    received_initial_snapshot = true;
+                                                    let state = engine_guard.get_current_state();
+                                                    let _ = ticker_data.orderbook_updates.send(state);
+                                                }
+                                            }
+                                            Err(e) => {
+                                                eprintln!("[{}] Error parsing initial snapshot: {}", ticker, e);
                                             }
                                         }
-                                        Err(_) => {
-                                            // Try parsing as delta
-                                            match parse_book_delta(&book_data) {
-                                                Ok(delta) => {
-                                                    let mut engine_guard = ticker_data.engine.write().await;
-                                                    if let Err(e) = engine_guard.apply_delta(&delta) {
-                                                        eprintln!("[{}] Error applying delta: {}", ticker, e);
-                                                    } else {
-                                                        let state = engine_guard.get_current_state();
-                                                        let _ = ticker_data.orderbook_updates.send(state);
-                                                    }
+                                    } else {
+                                        // Subsequent messages: treat as deltas
+                                        match parse_book_delta(&book_data) {
+                                            Ok(delta) => {
+                                                let mut engine_guard = ticker_data.engine.write().await;
+                                                if let Err(e) = engine_guard.apply_delta(&delta) {
+                                                    eprintln!("[{}] Error applying delta: {}", ticker, e);
+                                                } else {
+                                                    let state = engine_guard.get_current_state();
+                                                    let _ = ticker_data.orderbook_updates.send(state);
                                                 }
-                                                Err(e) => {
-                                                    eprintln!("[{}] Failed to parse message: {}", ticker, e);
-                                                }
+                                            }
+                                            Err(e) => {
+                                                eprintln!("[{}] Error parsing delta: {}", ticker, e);
                                             }
                                         }
                                     }
@@ -135,11 +144,11 @@ async fn main() -> anyhow::Result<()> {
             tickers.insert(ticker.to_string(), ticker_data.clone());
         }
         
-        // Start Kraken connection task for this ticker
-        start_kraken_task(ticker.to_string(), ticker_data.clone(), config.book_depth);
+                // Start Kraken connection task for this ticker  
+                start_kraken_task(ticker.to_string(), ticker_data.clone(), config.book_depth);
         
         // Start snapshot storage task for this ticker
-        start_snapshot_storage_task(engine.clone(), snapshot_store.clone(), config.clone());
+        start_snapshot_storage_task(ticker.to_string(), engine.clone(), snapshot_store.clone(), config.clone());
     }
     
     // Create AppState
@@ -156,10 +165,10 @@ async fn main() -> anyhow::Result<()> {
     let listener = TcpListener::bind(addr).await?;
     
     eprintln!("Server listening on http://{}", addr);
-    eprintln!("WebSocket endpoint: ws://{}/live", addr);
+    eprintln!("WebSocket endpoint: ws://{}/live?ticker=<TICKER>", addr);
     eprintln!("REST endpoints:");
-    eprintln!("  GET /snapshot/:timestamp");
-    eprintln!("  GET /history");
+    eprintln!("  GET /snapshot/:ticker/:timestamp");
+    eprintln!("  GET /history/:ticker");
     
     axum::serve(listener, app).await?;
     

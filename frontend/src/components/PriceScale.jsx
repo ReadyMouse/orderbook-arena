@@ -21,13 +21,27 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
   const scaleMax = propScaleMax;
 
   // Calculate tick marks using provided scale range
-  const { ticks, roundedCenter } = useMemo(() => {
+  const { ticks, roundedCenter, tickFontSize } = useMemo(() => {
     if (!lastPrice || scaleMin === null || scaleMax === null) {
-      return { ticks: [], roundedCenter: null };
+      return { ticks: [], roundedCenter: null, tickFontSize: 'text-base' };
     }
 
     const roundedCenter = Math.round(lastPrice / increment) * increment;
     const totalRange = scaleMax - scaleMin;
+    
+    // Dynamic font sizing based on price magnitude
+    // Count digits in the maximum price to determine appropriate font size
+    const maxPrice = Math.max(Math.abs(scaleMin), Math.abs(scaleMax));
+    const digitCount = Math.floor(Math.log10(maxPrice)) + 1;
+    
+    let tickFontSize = 'text-base'; // Default for prices < 3 digits ($0-$99)
+    if (digitCount >= 6) {
+      tickFontSize = 'text-[10px]'; // Very large numbers (100k+)
+    } else if (digitCount >= 5) {
+      tickFontSize = 'text-xs'; // Large numbers (10k-99k)
+    } else if (digitCount >= 4) {
+      tickFontSize = 'text-sm'; // Medium numbers (1k-9.9k)
+    }
 
     // Helper function to convert price to position percentage
     const priceToPosition = (price) => {
@@ -58,8 +72,19 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
     // Sort by position to ensure correct order
     ticks.sort((a, b) => a.position - b.position);
 
-    return { ticks, roundedCenter };
+    return { ticks, roundedCenter, tickFontSize };
   }, [lastPrice, scaleMin, scaleMax, increment]);
+
+  // Calculate dynamic font size for current price label (slightly larger than ticks)
+  const currentPriceFontSize = useMemo(() => {
+    if (!lastPrice) return 'text-sm';
+    const digitCount = Math.floor(Math.log10(Math.abs(lastPrice))) + 1;
+    
+    if (digitCount >= 6) return 'text-xs';
+    if (digitCount >= 5) return 'text-sm';
+    if (digitCount >= 4) return 'text-sm';
+    return 'text-base';
+  }, [lastPrice]);
 
   // Show loading only when scale range is not available
   if (scaleMin === null || scaleMax === null || ticks.length === 0) {
@@ -93,8 +118,8 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
             <div className="absolute top-0 bottom-1/2 w-0.5 bg-arcade-yellow" />
             {/* Current price label */}
             <div className="absolute bottom-1/2 left-1/2 transform -translate-x-1/2 mb-6 whitespace-nowrap">
-              <div className="bg-arcade-yellow text-arcade-bg px-2 py-1 text-sm font-arcade font-bold">
-                {lastPrice.toFixed(2)}
+              <div className={`bg-arcade-yellow text-arcade-bg px-2 py-1 ${currentPriceFontSize} font-arcade font-bold`}>
+                ${increment < 1 ? lastPrice.toFixed(2) : lastPrice.toFixed(0)}
               </div>
             </div>
           </div>
@@ -107,8 +132,8 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
           const isLeft = tick.isLeft;
           
           // Center tick is white, otherwise use side colors
-          const labelColor = isCenter ? 'text-arcade-white' : (isLeft ? 'text-arcade-blue' : 'text-arcade-red');
-          const tickColor = isCenter ? 'bg-arcade-white' : (isLeft ? 'bg-arcade-blue' : 'bg-arcade-red');
+          const labelColor = isCenter ? 'text-arcade-white' : (isLeft ? 'text-arcade-red' : 'text-arcade-blue');
+          const tickColor = isCenter ? 'bg-arcade-white' : (isLeft ? 'bg-arcade-red' : 'bg-arcade-blue');
           
           // Calculate distance from center for notch height variation
           const distanceFromCenter = Math.abs(tick.position - 50);
@@ -131,10 +156,10 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
               
               {/* Price label below the line */}
               <div
-                className={`absolute left-1/2 transform -translate-x-1/2 text-sm font-arcade ${labelColor} whitespace-nowrap`}
+                className={`absolute left-1/2 transform -translate-x-1/2 ${tickFontSize} font-arcade font-bold ${labelColor} whitespace-nowrap`}
                 style={{ top: `${notchHeight + 4}px` }}
               >
-                ${tick.price.toFixed(2)}
+                ${increment < 1 ? tick.price.toFixed(2) : tick.price.toFixed(0)}
               </div>
             </div>
           );
@@ -143,10 +168,10 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
         {/* Side labels */}
         {ticks.length > 0 && (
           <>
-            <div className="absolute left-2 top-1 text-xs font-arcade uppercase text-arcade-blue whitespace-nowrap">
+            <div className="absolute left-2 top-1 text-sm font-arcade font-bold uppercase text-arcade-red whitespace-nowrap">
               BUYERS
             </div>
-            <div className="absolute right-2 top-1 text-xs font-arcade uppercase text-arcade-red whitespace-nowrap">
+            <div className="absolute right-2 top-1 text-sm font-arcade font-bold uppercase text-arcade-blue whitespace-nowrap">
               SELLERS
             </div>
           </>

@@ -7,8 +7,8 @@ import spaceInvaderIcon from '../assets/space_invader.png';
  * Main container component for the orderbook visualization
  * 
  * This component displays the battle arena with:
- * - Sellers (asks) on the left side (red)
- * - Buyers (bids) on the right side (blue)
+ * - Buyers (bids) on the left side (red) - lower prices
+ * - Sellers (asks) on the right side (blue) - higher prices
  * - Centerline representing the last traded price
  */
 
@@ -388,9 +388,9 @@ function OrderbookView({ orderbookState }) {
     const max = Math.max(...sortedIntervalEntries.map(([_, data]) => data.volume));
     
     // Calculate how many icons can fit vertically (accounting for icon size and gap)
-    // Each icon is ~16px tall (text-base) + 2px gap (gap-0.5) = ~18px per icon
+    // Each icon is ~24px tall (w-6 h-6) + 4px gap (gap-1) = ~28px per icon
     // Leave some padding at top/bottom (~40px total)
-    const iconHeight = 18; // pixels per icon including gap
+    const iconHeight = 28; // pixels per icon including gap
     const padding = 40;
     const availableHeight = Math.max(arenaHeight - padding, 200); // Minimum 200px
     const maxIcons = Math.floor(availableHeight / iconHeight);
@@ -521,7 +521,7 @@ function OrderbookView({ orderbookState }) {
                   );
                 }
                 
-                const lineColor = line.isLeft ? 'bg-arcade-blue/15' : 'bg-arcade-red/15';
+                const lineColor = line.isLeft ? 'bg-arcade-red/15' : 'bg-arcade-blue/15';
                 return (
                   <div
                     key={`field-line-${line.price}`}
@@ -560,21 +560,21 @@ function OrderbookView({ orderbookState }) {
                   }}
                 >
                   {/* Center icons vertically around the midline, like football players on line of scrimmage */}
-                  <div className="flex flex-col items-center justify-center gap-0.5">
+                  <div className="flex flex-col items-center justify-center gap-1">
                     {Array.from({ length: iconCount }).map((_, i) => (
                       isLeft ? (
                         <img
                           key={`${columnKey}-icon-${i}`}
                           src={pacManIcon}
                           alt="buyer"
-                          className="w-4 h-4 inline-block"
+                          className="w-6 h-6 inline-block"
                         />
                       ) : (
                         <img
                           key={`${columnKey}-icon-${i}`}
                           src={spaceInvaderIcon}
                           alt="seller"
-                          className="w-4 h-4 inline-block"
+                          className="w-6 h-6 inline-block"
                         />
                       )
                     ))}
@@ -597,14 +597,14 @@ function OrderbookView({ orderbookState }) {
       {/* Legend - lower left corner */}
       {volumePerIcon > 0 && (
         <div className="flex-shrink-0 px-4 py-2 bg-arcade-dark">
-          <div className="text-xs font-arcade text-arcade-gray flex items-center gap-4">
+          <div className="text-sm font-arcade font-bold text-arcade-gray flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <img src={pacManIcon} alt="buyer" className="w-4 h-4" />
-              <span className="text-arcade-blue">Buyers</span>
+              <img src={pacManIcon} alt="buyer" className="w-5 h-5" />
+              <span className="text-arcade-red">Buyers</span>
             </div>
             <div className="flex items-center gap-2">
-              <img src={spaceInvaderIcon} alt="seller" className="w-4 h-4" />
-              <span className="text-arcade-red">Sellers</span>
+              <img src={spaceInvaderIcon} alt="seller" className="w-5 h-5" />
+              <span className="text-arcade-blue">Sellers</span>
             </div>
             <div className="border-l border-arcade-gray/30 pl-4">
               <span>Each icon = {volumePerIcon >= 1 ? volumePerIcon.toFixed(2) : volumePerIcon.toFixed(4)} volume</span>

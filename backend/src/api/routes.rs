@@ -54,8 +54,8 @@ pub fn create_router(state: AppState) -> Router {
     // WebSocket upgrades happen at the route level, not affected by CORS
     Router::new()
         .route("/live", axum::routing::get(handle_websocket))
-        .route("/snapshot/:timestamp", axum::routing::get(get_snapshot))
-        .route("/history", axum::routing::get(get_history))
+        .route("/snapshot/:ticker/:timestamp", axum::routing::get(get_snapshot))
+        .route("/history/:ticker", axum::routing::get(get_history))
         .layer(
             ServiceBuilder::new()
                 .layer(TraceLayer::new_for_http())
@@ -64,11 +64,11 @@ pub fn create_router(state: AppState) -> Router {
         .with_state(state)
 }
 
-/// GET /snapshot/{timestamp} - Retrieve snapshot by timestamp
+/// GET /snapshot/{ticker}/{timestamp} - Retrieve snapshot by ticker and timestamp
 /// 
 /// Returns 404 if snapshot not found, 400 if timestamp format is invalid
 async fn get_snapshot(
-    Path(timestamp_str): Path<String>,
+    Path((ticker, timestamp_str)): Path<(String, String)>,
     State(state): State<AppState>,
 ) -> Result<Json<Snapshot>, ApiError> {
     // Parse and validate timestamp format
@@ -78,26 +78,27 @@ async fn get_snapshot(
     
     // Retrieve snapshot from store
     state.snapshot_store
-        .get_snapshot(timestamp)
+        .get_snapshot(&ticker, timestamp)
         .await
         .map(Json)
-        .ok_or_else(|| ApiError::not_found(format!("No snapshot found for timestamp: {}", timestamp)))
+        .ok_or_else(|| ApiError::not_found(format!("No snapshot found for ticker {} at timestamp: {}", ticker, timestamp)))
 }
 
-/// GET /history - Get history range (min/max timestamps)
+/// GET /history/{ticker} - Get history range (min/max timestamps) for a specific ticker
 /// 
 /// Returns JSON with minTimestamp and maxTimestamp fields
-/// Returns 404 if no history is available
+/// Returns 404 if no history is available for this ticker
 async fn get_history(
+    Path(ticker): Path<String>,
     State(state): State<AppState>,
 ) -> Result<Json<Value>, ApiError> {
     state.snapshot_store
-        .get_history_range()
+        .get_history_range(&ticker)
         .await
         .map(|(min, max)| Json(json!({
             "minTimestamp": min,
             "maxTimestamp": max,
         })))
-        .ok_or_else(|| ApiError::not_found("No history available. No snapshots have been stored yet."))
+        .ok_or_else(|| ApiError::not_found(format!("No history available for ticker {}. No snapshots have been stored yet.", ticker)))
 }
 

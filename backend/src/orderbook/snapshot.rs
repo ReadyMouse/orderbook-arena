@@ -7,6 +7,9 @@ use crate::orderbook::engine::{PriceLevelEntry, OrderbookState};
 /// and retrieved for time-travel functionality.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Snapshot {
+    /// Ticker symbol (e.g., "ZEC", "BTC", "ETH", "XMR")
+    pub ticker: String,
+    
     /// Unix timestamp in seconds
     pub timestamp: i64,
     
@@ -24,12 +27,14 @@ pub struct Snapshot {
 impl Snapshot {
     /// Create a new snapshot from the given data
     pub fn new(
+        ticker: String,
         timestamp: i64,
         last_price: Option<f64>,
         bids: Vec<PriceLevelEntry>,
         asks: Vec<PriceLevelEntry>,
     ) -> Self {
         Self {
+            ticker,
             timestamp,
             last_price,
             bids,
@@ -37,9 +42,10 @@ impl Snapshot {
         }
     }
 
-    /// Create a snapshot from an OrderbookState
-    pub fn from_orderbook_state(state: OrderbookState) -> Self {
+    /// Create a snapshot from an OrderbookState with the given ticker
+    pub fn from_orderbook_state(ticker: String, state: OrderbookState) -> Self {
         Self {
+            ticker,
             timestamp: state.timestamp,
             last_price: state.last_price,
             bids: state.bids,

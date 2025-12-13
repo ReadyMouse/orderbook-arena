@@ -4,9 +4,10 @@ import { fetchSnapshot } from '../utils/api';
 /**
  * Custom hook for managing time-travel state and playback logic
  * 
+ * @param {string} ticker - The ticker symbol for which to fetch snapshots
  * @returns {Object} Time-travel state and control functions
  */
-export function useTimeTravel() {
+export function useTimeTravel(ticker) {
   // Time-travel state
   const [isTimeTravelMode, setIsTimeTravelMode] = useState(false);
   const [currentTimestamp, setCurrentTimestamp] = useState(null);
@@ -96,6 +97,13 @@ export function useTimeTravel() {
    * @param {number} timestamp - Unix timestamp in seconds
    */
   const fetchHistoricalSnapshot = useCallback(async (timestamp) => {
+    // Validate ticker
+    if (!ticker) {
+      setSnapshotError('No ticker specified');
+      setIsLoadingSnapshot(false);
+      return;
+    }
+
     // Validate timestamp
     if (timestamp == null || isNaN(timestamp) || timestamp < 0) {
       setSnapshotError('Invalid timestamp: must be a positive number');
@@ -103,14 +111,27 @@ export function useTimeTravel() {
       return;
     }
 
+    // Round timestamp to nearest 5-second interval based on when snapshots actually exist
+    // Use minTimestamp as the reference point since that's when snapshots started
+    let roundedTimestamp = timestamp;
+    if (minTimestamp != null) {
+      // Calculate offset from minTimestamp and round to nearest interval
+      const offset = timestamp - minTimestamp;
+      const roundedOffset = Math.round(offset / SNAPSHOT_INTERVAL_SECS) * SNAPSHOT_INTERVAL_SECS;
+      roundedTimestamp = minTimestamp + roundedOffset;
+    } else {
+      // Fallback: round to absolute 5-second intervals
+      roundedTimestamp = Math.round(timestamp / SNAPSHOT_INTERVAL_SECS) * SNAPSHOT_INTERVAL_SECS;
+    }
+
     // Validate timestamp is within history range
-    if (minTimestamp != null && timestamp < minTimestamp) {
+    if (minTimestamp != null && roundedTimestamp < minTimestamp) {
       setSnapshotError(`Timestamp is before available history (earliest: ${new Date(minTimestamp * 1000).toLocaleString()})`);
       setIsLoadingSnapshot(false);
       return;
     }
 
-    if (maxTimestamp != null && timestamp > maxTimestamp) {
+    if (maxTimestamp != null && roundedTimestamp > maxTimestamp) {
       setSnapshotError(`Timestamp is after available history (latest: ${new Date(maxTimestamp * 1000).toLocaleString()})`);
       setIsLoadingSnapshot(false);
       return;
@@ -120,9 +141,9 @@ export function useTimeTravel() {
     setSnapshotError(null);
 
     try {
-      const snapshot = await fetchSnapshot(timestamp);
+      const snapshot = await fetchSnapshot(ticker, roundedTimestamp);
       
-      // Snapshot format: { timestamp, lastPrice, bids: [{price, volume}], asks: [{price, volume}] }
+      // Snapshot format: { ticker, timestamp, lastPrice, bids: [{price, volume}], asks: [{price, volume}] }
       // This matches the orderbook format, so we can use it directly
       const orderbookState = {
         lastPrice: snapshot.lastPrice,
@@ -130,17 +151,24 @@ export function useTimeTravel() {
         asks: snapshot.asks || [],
       };
 
-      setHistoricalOrderbook(orderbookState);
-      setCurrentTimestamp(timestamp);
-      setSnapshotError(null);
+      // Only update the display if we have actual orderbook data (at least some bids or asks)
+      // This prevents showing empty frames - we keep the last frame until new data arrives
+      const hasData = orderbookState.bids.length > 0 || orderbookState.asks.length > 0;
+      
+      if (hasData) {
+        setHistoricalOrderbook(orderbookState);
+        setSnapshotError(null);
+      }
+      // Always update timestamp even if snapshot is empty, to keep playback moving
+      setCurrentTimestamp(roundedTimestamp);
     } catch (err) {
       console.error('Failed to fetch historical snapshot:', err);
       // Provide user-friendly error messages
       let errorMessage = 'Failed to fetch snapshot';
       if (err.message.includes('not found') || err.message.includes('404')) {
-        errorMessage = `Snapshot not found for timestamp: ${new Date(timestamp * 1000).toLocaleString()}. The snapshot may have been cleaned up or never existed.`;
+        errorMessage = `Snapshot not found for ${ticker} at timestamp: ${new Date(roundedTimestamp * 1000).toLocaleString()}. The snapshot may have been cleaned up or never existed.`;
       } else if (err.message.includes('Invalid timestamp') || err.message.includes('400')) {
-        errorMessage = `Invalid timestamp format: ${timestamp}`;
+        errorMessage = `Invalid timestamp format: ${roundedTimestamp}`;
       } else {
         errorMessage = err.message || errorMessage;
       }
@@ -150,7 +178,7 @@ export function useTimeTravel() {
     } finally {
       setIsLoadingSnapshot(false);
     }
-  }, [minTimestamp, maxTimestamp]);
+  }, [ticker, minTimestamp, maxTimestamp]);
 
   /**
    * Step to the next snapshot in the playback sequence
@@ -162,7 +190,9 @@ export function useTimeTravel() {
       return;
     }
 
-    const nextTimestamp = currentTimestamp + SNAPSHOT_INTERVAL_SECS;
+    // Round current timestamp to nearest interval first (in case it's not aligned)
+    const alignedCurrent = Math.round(currentTimestamp / SNAPSHOT_INTERVAL_SECS) * SNAPSHOT_INTERVAL_SECS;
+    const nextTimestamp = alignedCurrent + SNAPSHOT_INTERVAL_SECS;
     
     // Stop if we've reached the end
     if (nextTimestamp > maxTimestamp) {
@@ -184,7 +214,9 @@ export function useTimeTravel() {
       return;
     }
 
-    const prevTimestamp = currentTimestamp - SNAPSHOT_INTERVAL_SECS;
+    // Round current timestamp to nearest interval first (in case it's not aligned)
+    const alignedCurrent = Math.round(currentTimestamp / SNAPSHOT_INTERVAL_SECS) * SNAPSHOT_INTERVAL_SECS;
+    const prevTimestamp = alignedCurrent - SNAPSHOT_INTERVAL_SECS;
     
     // Stop if we've reached the beginning
     if (prevTimestamp < minTimestamp) {

@@ -19,8 +19,11 @@ function App() {
   // Ticker selection state
   const [selectedTicker, setSelectedTicker] = useState('ZEC');
   
-  // Time-travel hook
-  const timeTravel = useTimeTravel();
+  // Track if user tried to enter time travel but no history available
+  const [noHistoryError, setNoHistoryError] = useState(false);
+  
+  // Time-travel hook (pass the selected ticker)
+  const timeTravel = useTimeTravel(selectedTicker);
   const {
     isTimeTravelMode,
     currentTimestamp,
@@ -44,19 +47,20 @@ function App() {
   // WebSocket hook - pause updates when in time-travel mode, pass selected ticker
   const { orderbookState, error, isConnected } = useWebSocket(isTimeTravelMode, selectedTicker);
 
-  // Fetch history range on mount
+  // Fetch history range when ticker changes
   useEffect(() => {
     const loadHistory = async () => {
       try {
-        const history = await fetchHistory();
+        const history = await fetchHistory(selectedTicker);
         setHistoryRange(history.minTimestamp, history.maxTimestamp);
+        setNoHistoryError(false); // Clear error when history becomes available
       } catch (err) {
         console.error('Failed to fetch history:', err);
         // Don't show error if no history is available yet (backend might not have snapshots)
       }
     };
     loadHistory();
-  }, [setHistoryRange]);
+  }, [selectedTicker, setHistoryRange]);
 
   // Handle timestamp changes from slider (when not playing)
   useEffect(() => {
@@ -70,33 +74,25 @@ function App() {
 
   // Handle entering time-travel mode
   const handleEnterTimeTravel = () => {
-    // Check if history is available
-    if (minTimestamp == null || maxTimestamp == null) {
-      // Try to fetch history first
-      fetchHistory()
-        .then((history) => {
-          setHistoryRange(history.minTimestamp, history.maxTimestamp);
-          enterTimeTravelMode();
-          // Start at the beginning of history
-          if (history.minTimestamp != null) {
-            fetchHistoricalSnapshot(history.minTimestamp);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed to fetch history:', err);
-          // Still enter time-travel mode, but show error
-          enterTimeTravelMode();
-        });
-    } else {
-      enterTimeTravelMode();
-      // Fetch initial snapshot if we have a current timestamp
-      if (currentTimestamp != null) {
-        fetchHistoricalSnapshot(currentTimestamp);
-      } else if (minTimestamp != null) {
+    // Always fetch fresh history when entering time travel mode
+    // This ensures we get the latest snapshot range from the server
+    fetchHistory(selectedTicker)
+      .then((history) => {
+        setHistoryRange(history.minTimestamp, history.maxTimestamp);
+        setNoHistoryError(false);
+        enterTimeTravelMode();
         // Start at the beginning of history
-        fetchHistoricalSnapshot(minTimestamp);
-      }
-    }
+        if (history.minTimestamp != null) {
+          fetchHistoricalSnapshot(history.minTimestamp);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to fetch history:', err);
+        // Don't enter time-travel mode if no history is available
+        setNoHistoryError(true);
+        // Clear the error after 5 seconds
+        setTimeout(() => setNoHistoryError(false), 5000);
+      });
   };
 
   // Handle exiting time-travel mode
@@ -156,6 +152,11 @@ function App() {
               Error: {error}
             </div>
           )}
+          {noHistoryError && !isTimeTravelMode && (
+            <div className="text-sm text-arcade-yellow font-arcade">
+              ⚠ No history yet. Wait ~10 seconds for snapshots to accumulate.
+            </div>
+          )}
           {snapshotError && isTimeTravelMode && (
             <div className="text-sm text-arcade-red font-arcade">
               ⚠ {snapshotError}
@@ -190,17 +191,24 @@ function App() {
       <footer className="p-4 border-t-2 border-arcade-white">
         <div className="max-w-4xl mx-auto space-y-4">
           {/* Mode toggle */}
-          <div className="flex justify-center">
+          <div className="flex flex-col items-center gap-2">
             {!isTimeTravelMode ? (
-              <button
-                onClick={handleEnterTimeTravel}
-                className="px-6 py-2 font-arcade uppercase text-sm
-                           bg-arcade-purple text-arcade-white border-2 border-arcade-purple
-                           shadow-arcade hover:bg-arcade-purple/80
-                           active:shadow-none active:translate-x-1 active:translate-y-1"
-              >
-                ⏱ Enter Time Travel Mode
-              </button>
+              <>
+                <button
+                  onClick={handleEnterTimeTravel}
+                  className="px-6 py-2 font-arcade uppercase text-sm
+                             bg-arcade-purple text-arcade-white border-2 border-arcade-purple
+                             shadow-arcade hover:bg-arcade-purple/80
+                             active:shadow-none active:translate-x-1 active:translate-y-1"
+                >
+                  ⏱ Enter Time Travel Mode
+                </button>
+                {(minTimestamp == null || maxTimestamp == null) && (
+                  <div className="text-xs text-arcade-gray font-arcade">
+                    Collecting history... snapshots available in ~10 seconds
+                  </div>
+                )}
+              </>
             ) : (
               <button
                 onClick={handleExitTimeTravel}

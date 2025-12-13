@@ -15,6 +15,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 /// 
 /// Returns a handle that can be used to abort the task.
 pub fn start_snapshot_storage_task(
+    ticker: String,
     engine: Arc<RwLock<OrderbookEngine>>,
     store: Arc<SnapshotStore>,
     config: Config,
@@ -36,18 +37,22 @@ pub fn start_snapshot_storage_task(
             };
 
             // Convert to snapshot and store
-            let snapshot = Snapshot::from_orderbook_state(state);
+            let snapshot = Snapshot::from_orderbook_state(ticker.clone(), state);
+            eprintln!("[{}] Storing snapshot at timestamp: {}, bids: {}, asks: {}", 
+                      ticker, snapshot.timestamp, snapshot.bids.len(), snapshot.asks.len());
             store.store_snapshot(snapshot).await;
 
-            // Clean up old snapshots
-            let cutoff_timestamp = SystemTime::now()
+            // Clean up old snapshots for this ticker
+            let now_timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
-                .as_secs() as i64 - retention_secs;
+                .as_secs() as i64;
+            let cutoff_timestamp = now_timestamp - retention_secs;
 
-            let removed_count = store.remove_older_than(cutoff_timestamp).await;
+            let removed_count = store.remove_older_than(cutoff_timestamp, Some(&ticker)).await;
             if removed_count > 0 {
-                eprintln!("Cleaned up {} old snapshots", removed_count);
+                eprintln!("[{}] Cleaned up {} old snapshots (now: {}, cutoff: {}, retention: {}s)", 
+                          ticker, removed_count, now_timestamp, cutoff_timestamp, retention_secs);
             }
         }
     })
@@ -64,6 +69,7 @@ mod tests {
         let engine = Arc::new(RwLock::new(OrderbookEngine::new()));
         let store = Arc::new(SnapshotStore::new());
         let config = Config::new().with_snapshot_interval(1); // 1 second for faster test
+        let ticker = "BTC".to_string();
 
         // Populate engine with some data
         {
@@ -81,7 +87,7 @@ mod tests {
         }
 
         // Start the snapshot storage task
-        let handle = start_snapshot_storage_task(engine.clone(), store.clone(), config);
+        let handle = start_snapshot_storage_task(ticker.clone(), engine.clone(), store.clone(), config);
 
         // Wait a bit for at least one snapshot to be stored
         tokio::time::sleep(tokio::time::Duration::from_millis(1100)).await;
@@ -94,12 +100,13 @@ mod tests {
         assert!(store.len().await >= 1);
 
         // Verify we can retrieve a snapshot
-        let range = store.get_history_range().await;
+        let range = store.get_history_range(&ticker).await;
         assert!(range.is_some());
         if let Some((min, _max)) = range {
-            let snapshot = store.get_snapshot(min).await;
+            let snapshot = store.get_snapshot(&ticker, min).await;
             assert!(snapshot.is_some());
             let snapshot = snapshot.unwrap();
+            assert_eq!(snapshot.ticker, ticker);
             assert_eq!(snapshot.last_price, Some(42000.0));
             assert_eq!(snapshot.bids.len(), 1);
             assert_eq!(snapshot.asks.len(), 1);
