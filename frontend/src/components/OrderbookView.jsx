@@ -450,7 +450,7 @@ function OrderbookView({ orderbookState }) {
         <div className="flex items-center gap-4">
           <span className="text-xs font-arcade text-arcade-gray">Price Spacing:</span>
           <div className="flex gap-2">
-            {[0.01, 0.1, 1, 5, 10].map((increment) => (
+            {[0.01, 0.1, 1, 5, 10, 100, 1000, 10000].map((increment) => (
               <button
                 key={increment}
                 onClick={() => setPriceIncrement(increment)}
@@ -460,7 +460,7 @@ function OrderbookView({ orderbookState }) {
                     : 'bg-arcade-gray/20 text-arcade-gray hover:bg-arcade-gray/30'
                 }`}
               >
-                ${increment}
+                ${increment >= 1000 ? `${increment / 1000}k` : increment}
               </button>
             ))}
           </div>

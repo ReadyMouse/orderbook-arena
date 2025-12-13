@@ -5,9 +5,10 @@ const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/live';
 /**
  * Custom hook for managing WebSocket connection to the backend
  * @param {boolean} pauseUpdates - If true, WebSocket messages won't update orderbookState (connection stays alive)
+ * @param {string} ticker - Trading pair symbol (e.g., 'ZEC', 'BTC', 'ETH', 'XMR')
  * @returns {Object} { orderbookState, error, isConnected }
  */
-export function useWebSocket(pauseUpdates = false) {
+export function useWebSocket(pauseUpdates = false, ticker = 'ZEC') {
   const [orderbookState, setOrderbookState] = useState(null);
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -15,13 +16,17 @@ export function useWebSocket(pauseUpdates = false) {
   const reconnectTimeoutRef = useRef(null);
   const reconnectAttemptsRef = useRef(0);
   const pauseUpdatesRef = useRef(pauseUpdates);
+  const tickerRef = useRef(ticker);
+  const isIntentionalCloseRef = useRef(false); // Track if we're intentionally closing (e.g., ticker change)
   const lastValidStateRef = useRef(null); // Keep last valid state to prevent flashing
   const accumulatedOrderbookRef = useRef({ bids: new Map(), asks: new Map(), lastPrice: null, timestamp: null }); // Accumulate full orderbook
   const isFirstMessageRef = useRef(true); // Track if this is the first message after connection
 
   const connect = useCallback(() => {
     try {
-      const ws = new WebSocket(WS_URL);
+      // Append ticker as query parameter
+      const wsUrlWithTicker = `${WS_URL}?ticker=${tickerRef.current}`;
+      const ws = new WebSocket(wsUrlWithTicker);
       wsRef.current = ws;
 
       ws.onopen = () => {
@@ -154,15 +159,17 @@ export function useWebSocket(pauseUpdates = false) {
         console.log('WebSocket disconnected', {
           code: event.code,
           reason: event.reason,
-          wasClean: event.wasClean
+          wasClean: event.wasClean,
+          isIntentional: isIntentionalCloseRef.current
         });
         setIsConnected(false);
         
         // Don't clear orderbookState on disconnect - keep last valid state to prevent flashing
         // The state will update when reconnected and new data arrives
         
-        // Don't reconnect if it was a clean close or if we're shutting down
-        if (event.wasClean) {
+        // Don't reconnect if it was intentional (ticker change) or a clean close
+        if (isIntentionalCloseRef.current || event.wasClean) {
+          isIntentionalCloseRef.current = false; // Reset flag
           return;
         }
         
@@ -187,10 +194,36 @@ export function useWebSocket(pauseUpdates = false) {
     pauseUpdatesRef.current = pauseUpdates;
   }, [pauseUpdates]);
 
+  // Connect on mount and reconnect when ticker changes
   useEffect(() => {
+    console.log('Ticker changed to:', ticker);
+    tickerRef.current = ticker;
+    
+    // Close existing connection if ticker changed (mark as intentional)
+    if (wsRef.current) {
+      console.log('Closing existing WebSocket connection for ticker change');
+      isIntentionalCloseRef.current = true;
+      wsRef.current.close();
+    }
+    
+    // Clear any pending reconnection
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+    
+    // Reset accumulated state when ticker changes
+    accumulatedOrderbookRef.current = { bids: new Map(), asks: new Map(), lastPrice: null, timestamp: null };
+    lastValidStateRef.current = null;
+    setOrderbookState(null);
+    reconnectAttemptsRef.current = 0;
+    
+    // Connect with current ticker
+    console.log('Establishing new connection for ticker:', ticker);
     connect();
 
+    // Cleanup on unmount
     return () => {
+      isIntentionalCloseRef.current = true;
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current);
       }
@@ -198,7 +231,7 @@ export function useWebSocket(pauseUpdates = false) {
         wsRef.current.close();
       }
     };
-  }, [connect]);
+  }, [ticker, connect]);
 
   // Return last valid state if current state is null (to prevent flashing during reconnects)
   const displayState = orderbookState || lastValidStateRef.current;

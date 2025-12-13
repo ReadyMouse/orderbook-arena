@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useTimeTravel } from './hooks/useTimeTravel';
 import { fetchHistory } from './utils/api';
@@ -7,7 +7,18 @@ import TimeSlider from './components/TimeSlider';
 import Controls from './components/Controls';
 import './App.css';
 
+// Available ticker symbols
+const TICKERS = [
+  { symbol: 'ZEC', pair: 'ZEC/USD', label: 'ZEC/USD' },
+  { symbol: 'BTC', pair: 'BTC/USD', label: 'BTC/USD' },
+  { symbol: 'ETH', pair: 'ETH/USD', label: 'ETH/USD' },
+  { symbol: 'XMR', pair: 'XMR/USD', label: 'XMR/USD' },
+];
+
 function App() {
+  // Ticker selection state
+  const [selectedTicker, setSelectedTicker] = useState('ZEC');
+  
   // Time-travel hook
   const timeTravel = useTimeTravel();
   const {
@@ -30,8 +41,8 @@ function App() {
     fetchHistoricalSnapshot,
   } = timeTravel;
 
-  // WebSocket hook - pause updates when in time-travel mode
-  const { orderbookState, error, isConnected } = useWebSocket(isTimeTravelMode);
+  // WebSocket hook - pause updates when in time-travel mode, pass selected ticker
+  const { orderbookState, error, isConnected } = useWebSocket(isTimeTravelMode, selectedTicker);
 
   // Fetch history range on mount
   useEffect(() => {
@@ -120,9 +131,22 @@ function App() {
     <div className="min-h-screen bg-arcade-bg text-arcade-white">
       {/* Header */}
       <header className="p-4 border-b-2 border-arcade-white">
-        <h1 className="text-3xl font-arcade uppercase text-center">
-          Orderbook Arena
-        </h1>
+        <div className="flex items-center justify-center gap-4 mb-2">
+          <h1 className="text-3xl font-arcade uppercase">
+            Orderbook Arena:
+          </h1>
+          <select
+            value={selectedTicker}
+            onChange={(e) => setSelectedTicker(e.target.value)}
+            className="px-4 py-2 text-xl font-arcade bg-arcade-dark border-2 border-arcade-white text-arcade-white cursor-pointer hover:bg-arcade-gray/20 focus:outline-none focus:ring-2 focus:ring-arcade-yellow"
+          >
+            {TICKERS.map((ticker) => (
+              <option key={ticker.symbol} value={ticker.symbol}>
+                {ticker.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="flex justify-center items-center gap-4 mt-2">
           <div className={`text-sm ${isTimeTravelMode ? 'text-arcade-yellow' : isConnected ? 'text-arcade-green' : 'text-arcade-red'}`}>
             {isTimeTravelMode ? '⏱ TIME TRAVEL' : isConnected ? '● LIVE' : '○ OFFLINE'}

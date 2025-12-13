@@ -10,7 +10,8 @@ use axum::{
     Router,
 };
 use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
+use std::collections::HashMap;
+use tokio::sync::{broadcast, RwLock, Mutex};
 use crate::orderbook::store::SnapshotStore;
 use crate::orderbook::snapshot::Snapshot;
 use crate::orderbook::engine::{OrderbookState, OrderbookEngine};
@@ -18,14 +19,21 @@ use crate::api::error::ApiError;
 use crate::api::websocket::handle_websocket;
 use serde_json::{json, Value};
 
-/// Application state shared across all handlers
+/// Per-ticker orderbook data
 #[derive(Clone)]
-pub struct AppState {
-    pub snapshot_store: Arc<SnapshotStore>,
+pub struct TickerData {
     /// Broadcast channel for streaming orderbook updates to WebSocket clients
     pub orderbook_updates: broadcast::Sender<OrderbookState>,
     /// Orderbook engine for getting current state
     pub engine: Arc<RwLock<OrderbookEngine>>,
+}
+
+/// Application state shared across all handlers
+#[derive(Clone)]
+pub struct AppState {
+    pub snapshot_store: Arc<SnapshotStore>,
+    /// Map of ticker symbol to ticker data
+    pub tickers: Arc<Mutex<HashMap<String, TickerData>>>,
 }
 
 /// Create the REST API router with all routes
