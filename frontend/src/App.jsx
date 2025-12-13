@@ -126,7 +126,7 @@ function App() {
   return (
     <div className="min-h-screen bg-arcade-bg text-arcade-white">
       {/* Header */}
-      <header className="p-4 border-b-2 border-arcade-white">
+      <header className="p-4 border-b-2 border-arcade-white relative">
         <div className="flex items-center justify-center gap-4 mb-2">
           <h1 className="text-3xl font-arcade uppercase">
             Orderbook Arena:
@@ -142,6 +142,31 @@ function App() {
               </option>
             ))}
           </select>
+        </div>
+        
+        {/* Mode toggle - upper right corner */}
+        <div className="absolute top-4 right-4">
+          {!isTimeTravelMode ? (
+            <button
+              onClick={handleEnterTimeTravel}
+              className="px-4 py-2 font-arcade uppercase text-xs
+                         bg-arcade-purple text-arcade-white border-2 border-arcade-purple
+                         shadow-arcade hover:bg-arcade-purple/80
+                         active:shadow-none active:translate-x-1 active:translate-y-1"
+            >
+              ⏱ Time Travel
+            </button>
+          ) : (
+            <button
+              onClick={handleExitTimeTravel}
+              className="px-4 py-2 font-arcade uppercase text-xs
+                         bg-arcade-gray text-arcade-white border-2 border-arcade-gray
+                         shadow-arcade hover:bg-arcade-gray/80
+                         active:shadow-none active:translate-x-1 active:translate-y-1"
+            >
+              ← Return to Live
+            </button>
+          )}
         </div>
         <div className="flex justify-center items-center gap-4 mt-2">
           <div className={`text-sm ${isTimeTravelMode ? 'text-arcade-yellow' : isConnected ? 'text-arcade-green' : 'text-arcade-red'}`}>
@@ -190,37 +215,14 @@ function App() {
       {/* Controls section */}
       <footer className="p-4 border-t-2 border-arcade-white">
         <div className="max-w-4xl mx-auto space-y-4">
-          {/* Mode toggle */}
-          <div className="flex flex-col items-center gap-2">
-            {!isTimeTravelMode ? (
-              <>
-                <button
-                  onClick={handleEnterTimeTravel}
-                  className="px-6 py-2 font-arcade uppercase text-sm
-                             bg-arcade-purple text-arcade-white border-2 border-arcade-purple
-                             shadow-arcade hover:bg-arcade-purple/80
-                             active:shadow-none active:translate-x-1 active:translate-y-1"
-                >
-                  ⏱ Enter Time Travel Mode
-                </button>
-                {(minTimestamp == null || maxTimestamp == null) && (
-                  <div className="text-xs text-arcade-gray font-arcade">
-                    Collecting history... snapshots available in ~10 seconds
-                  </div>
-                )}
-              </>
-            ) : (
-              <button
-                onClick={handleExitTimeTravel}
-                className="px-6 py-2 font-arcade uppercase text-sm
-                           bg-arcade-gray text-arcade-white border-2 border-arcade-gray
-                           shadow-arcade hover:bg-arcade-gray/80
-                           active:shadow-none active:translate-x-1 active:translate-y-1"
-              >
-                ← Return to Live
-              </button>
-            )}
-          </div>
+          {/* Info message for history collection */}
+          {!isTimeTravelMode && (minTimestamp == null || maxTimestamp == null) && (
+            <div className="flex justify-center">
+              <div className="text-xs text-arcade-gray font-arcade">
+                Collecting history... snapshots available in ~10 seconds
+              </div>
+            </div>
+          )}
 
           {/* Time-travel controls (only shown in time-travel mode) */}
           {isTimeTravelMode && (
