@@ -21,9 +21,9 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
   const scaleMax = propScaleMax;
 
   // Calculate tick marks using provided scale range
-  const { ticks } = useMemo(() => {
+  const { ticks, roundedCenter } = useMemo(() => {
     if (!lastPrice || scaleMin === null || scaleMax === null) {
-      return { ticks: [] };
+      return { ticks: [], roundedCenter: null };
     }
 
     const roundedCenter = Math.round(lastPrice / increment) * increment;
@@ -39,7 +39,9 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
     const ticks = [];
     
     // Generate ticks from scaleMin to scaleMax at increment intervals
-    for (let price = scaleMin; price <= scaleMax; price += increment) {
+    // Start from scaleMin + increment to avoid the leftmost tick being cut off
+    // End before scaleMax to avoid the rightmost tick being cut off
+    for (let price = scaleMin + increment; price < scaleMax; price += increment) {
       // Round to avoid floating point precision issues
       const roundedPrice = Math.round(price * 100) / 100;
       
@@ -56,7 +58,7 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
     // Sort by position to ensure correct order
     ticks.sort((a, b) => a.position - b.position);
 
-    return { ticks };
+    return { ticks, roundedCenter };
   }, [lastPrice, scaleMin, scaleMax, increment]);
 
   // Show loading only when scale range is not available
@@ -100,9 +102,13 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
 
         {/* Ruler notches - extending in both directions from center */}
         {ticks.map((tick, index) => {
+          // Check if this is the center tick
+          const isCenter = roundedCenter !== null && Math.abs(tick.price - roundedCenter) < increment / 2;
           const isLeft = tick.isLeft;
-          const labelColor = isLeft ? 'text-arcade-blue' : 'text-arcade-red';
-          const tickColor = isLeft ? 'bg-arcade-blue' : 'bg-arcade-red';
+          
+          // Center tick is white, otherwise use side colors
+          const labelColor = isCenter ? 'text-arcade-white' : (isLeft ? 'text-arcade-blue' : 'text-arcade-red');
+          const tickColor = isCenter ? 'bg-arcade-white' : (isLeft ? 'bg-arcade-blue' : 'bg-arcade-red');
           
           // Calculate distance from center for notch height variation
           const distanceFromCenter = Math.abs(tick.position - 50);
@@ -128,7 +134,7 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
                 className={`absolute left-1/2 transform -translate-x-1/2 text-sm font-arcade ${labelColor} whitespace-nowrap`}
                 style={{ top: `${notchHeight + 4}px` }}
               >
-                ${tick.price.toFixed(0)}
+                ${tick.price.toFixed(2)}
               </div>
             </div>
           );

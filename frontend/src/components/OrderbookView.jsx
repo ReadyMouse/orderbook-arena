@@ -248,12 +248,8 @@ function OrderbookView({ orderbookState }) {
     const increment = priceIncrement;
     const roundedCenter = Math.round(effectiveLastPrice / increment) * increment;
     
-    // Cap incrementsPerSide to keep scale readable at small increments
-    const leftRange = effectiveLastPrice - minPrice;
-    const rightRange = maxPrice - effectiveLastPrice;
-    const maxRange = Math.max(leftRange, rightRange);
-    const maxIncrementsFromData = Math.ceil(maxRange / increment) + 2;
-    const incrementsPerSide = Math.min(Math.max(5, maxIncrementsFromData), 15); // Cap at 15 per side
+    // Set to exactly 8 increments per side for consistent scale and readability
+    const incrementsPerSide = 8;
     
     const scaleMin = roundedCenter - (incrementsPerSide * increment);
     const scaleMax = roundedCenter + (incrementsPerSide * increment);
@@ -263,6 +259,7 @@ function OrderbookView({ orderbookState }) {
 
   // Calculate volume for each price interval using ALL orders (not just limited)
   // Uses the shared scaleRange to ensure alignment with PriceScale
+  // IMPORTANT: Keeps buyer and seller volumes SEPARATE to avoid mixing on centerline
   const intervalVolumes = useMemo(() => {
     if (!scaleRange.scaleMin || !scaleRange.scaleMax) {
       return new Map();
@@ -277,12 +274,16 @@ function OrderbookView({ orderbookState }) {
     const { scaleMin, scaleMax, roundedCenter } = scaleRange;
     const totalRange = scaleMax - scaleMin;
     
+    // Define no-man's-land buffer zone around center (in price units)
+    // This creates space around the midline where no icons appear
+    const bufferZone = increment * 0.75; // 75% of one increment on each side
+    
     const priceToPosition = (price) => {
       if (totalRange === 0) return 50;
       return ((price - scaleMin) / totalRange) * 100;
     };
 
-    // Generate intervals at fixed $10 increments (matching field lines)
+    // Generate intervals at fixed increments (matching field lines)
     const volumes = new Map();
     
     // Debug: log the range we're checking
@@ -301,6 +302,7 @@ function OrderbookView({ orderbookState }) {
         minPrice,
         maxPrice,
         roundedCenter,
+        bufferZone,
         bidsCount: bids.length,
         asksCount: asks.length,
         actualMinPrice: actualMin,
@@ -309,51 +311,60 @@ function OrderbookView({ orderbookState }) {
       });
     }
     
-    for (let price = scaleMin; price <= scaleMax; price += increment) {
+    // Start from scaleMin + increment to align with PriceScale ticks (avoid leftmost tick)
+    // End before scaleMax to avoid rightmost tick being cut off
+    for (let price = scaleMin + increment; price < scaleMax; price += increment) {
       const roundedPrice = Math.round(price * 100) / 100;
-      // Don't skip center interval - we want to show volume there too
-      // The center line will still be drawn separately
+      
+      // Skip intervals in the no-man's-land buffer zone around center
+      if (Math.abs(roundedPrice - roundedCenter) < bufferZone) {
+        continue;
+      }
       
       const intervalStart = roundedPrice;
       const intervalEnd = roundedPrice + increment;
       
-      // Aggregate volume from ALL bids and asks in this interval
-      let totalVolume = 0;
-      let matchedBids = 0;
-      let matchedAsks = 0;
+      // Determine which side of center this interval is on
+      const isLeftSide = roundedPrice < roundedCenter;
       
-      // Check all bids
-      bids.forEach((bid) => {
-        if (bid && typeof bid.price === 'number' && typeof bid.volume === 'number') {
-          if (bid.price >= intervalStart && bid.price < intervalEnd) {
-            totalVolume += bid.volume;
-            matchedBids++;
+      // ONLY aggregate volume from the correct side
+      let sideVolume = 0;
+      let matchedOrders = 0;
+      
+      if (isLeftSide) {
+        // Left side = buyers only
+        bids.forEach((bid) => {
+          if (bid && typeof bid.price === 'number' && typeof bid.volume === 'number') {
+            if (bid.price >= intervalStart && bid.price < intervalEnd) {
+              sideVolume += bid.volume;
+              matchedOrders++;
+            }
           }
-        }
-      });
-      
-      // Check all asks
-      asks.forEach((ask) => {
-        if (ask && typeof ask.price === 'number' && typeof ask.volume === 'number') {
-          if (ask.price >= intervalStart && ask.price < intervalEnd) {
-            totalVolume += ask.volume;
-            matchedAsks++;
+        });
+      } else {
+        // Right side = sellers only
+        asks.forEach((ask) => {
+          if (ask && typeof ask.price === 'number' && typeof ask.volume === 'number') {
+            if (ask.price >= intervalStart && ask.price < intervalEnd) {
+              sideVolume += ask.volume;
+              matchedOrders++;
+            }
           }
-        }
-      });
+        });
+      }
       
-      // Include interval if it has volume
-      if (totalVolume > 0) {
+      // Include interval if it has volume on the correct side
+      if (sideVolume > 0) {
         const position = priceToPosition(roundedPrice);
         volumes.set(roundedPrice, {
-          volume: totalVolume,
+          volume: sideVolume,
           position: position,
-          isLeft: roundedPrice < roundedCenter,
+          isLeft: isLeftSide,
         });
         
         // Debug log for intervals with volume
         if (process.env.NODE_ENV === 'development') {
-          console.log(`Interval ${intervalStart}-${intervalEnd}: volume=${totalVolume.toFixed(4)}, bids=${matchedBids}, asks=${matchedAsks}, position=${position.toFixed(2)}%, roundedPrice=${roundedPrice}, scaleMin=${scaleMin}, scaleMax=${scaleMax}, totalRange=${totalRange}`);
+          console.log(`Interval ${intervalStart}-${intervalEnd}: volume=${sideVolume.toFixed(4)}, side=${isLeftSide ? 'buyers' : 'sellers'}, orders=${matchedOrders}, position=${position.toFixed(2)}%`);
         }
       }
     }
@@ -477,9 +488,11 @@ function OrderbookView({ orderbookState }) {
             return ((price - scaleMin) / totalRange) * 100;
           };
           
-          // Generate field lines at fixed $10 increments (matching PriceScale)
+          // Generate field lines at fixed increments (matching PriceScale)
           const fieldLines = [];
-          for (let price = scaleMin; price <= scaleMax; price += increment) {
+          // Start from scaleMin + increment to avoid the leftmost line being cut off
+          // End before scaleMax to avoid the rightmost line being cut off (match PriceScale)
+          for (let price = scaleMin + increment; price < scaleMax; price += increment) {
             const roundedPrice = Math.round(price * 100) / 100;
             if (roundedPrice >= minPrice - increment && roundedPrice <= maxPrice + increment) {
               const isCenter = Math.abs(roundedPrice - roundedCenter) < increment / 2;
@@ -523,13 +536,13 @@ function OrderbookView({ orderbookState }) {
         
         {/* Volume icon columns - aligned with price scale ticks */}
         {effectiveLastPrice && minPrice && maxPrice && sortedIntervalEntries.length > 0 && volumePerIcon > 0 && (
-          <>
+          <div key={`volume-columns-${priceIncrement}`}>
             {sortedIntervalEntries.map(([price, { volume, position, isLeft }]) => {
               // Calculate number of icons based on dynamic scale
               const iconCount = Math.max(1, Math.floor(volume / volumePerIcon));
               
-              // Use price as key for stability
-              const columnKey = `volume-column-${price.toFixed(0)}`;
+              // Use full price precision and increment in key to avoid collisions and force reset on increment change
+              const columnKey = `col-${priceIncrement}-${price.toFixed(4)}`;
               
               // Debug log for rendering
               if (process.env.NODE_ENV === 'development') {
@@ -569,7 +582,7 @@ function OrderbookView({ orderbookState }) {
                 </div>
               );
             })}
-          </>
+          </div>
         )}
         
         {/* Center line (yard line 50) - prominent */}
