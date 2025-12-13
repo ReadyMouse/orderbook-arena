@@ -1,80 +1,32 @@
-import { useMemo, memo, useState, useEffect } from 'react';
+import { useMemo, memo } from 'react';
 
 /**
  * Price scale component that displays a horizontal scale centered on the last sale price
  * Left side shows negative values (buyers/bids below current price)
  * Right side shows positive values (sellers/asks above current price)
  * 
- * The scale remains fixed until the current price deviates by more than the threshold
- * from the fixed center, preventing flashing on each update.
- * 
  * @param {Object} props
  * @param {number|null} props.lastPrice - Last traded price (center of scale)
  * @param {number|null} props.minPrice - Minimum price in the orderbook
  * @param {number|null} props.maxPrice - Maximum price in the orderbook
  * @param {number} props.increment - Fixed increment for tick marks (default: 10)
- * @param {number} props.deviationThreshold - Price deviation threshold to recenter scale (default: 5)
+ * @param {number|null} props.scaleMin - Fixed scale minimum (from parent)
+ * @param {number|null} props.scaleMax - Fixed scale maximum (from parent)
  */
 
-function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, deviationThreshold = 5 }) {
-  // Track the fixed scale center and range - only updates when price deviates beyond threshold
-  const [fixedScaleCenter, setFixedScaleCenter] = useState(null);
-  const [fixedScaleRange, setFixedScaleRange] = useState({ scaleMin: null, scaleMax: null });
+function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: propScaleMin, scaleMax: propScaleMax }) {
+  // Use scale range provided by parent (synced with OrderbookView)
+  // This ensures tick marks align with volume columns
+  const scaleMin = propScaleMin;
+  const scaleMax = propScaleMax;
 
-  // Update fixed scale center when price deviates beyond threshold
-  useEffect(() => {
-    if (!lastPrice) return;
-
-    const roundedCurrentCenter = Math.round(lastPrice / increment) * increment;
-
-    // Initialize fixed center and range if not set
-    if (fixedScaleCenter === null) {
-      // Calculate initial range based on available data or use defaults
-      const initialIncrementsPerSide = 10; // Show 10 increments on each side initially
-      const initialScaleMin = roundedCurrentCenter - (initialIncrementsPerSide * increment);
-      const initialScaleMax = roundedCurrentCenter + (initialIncrementsPerSide * increment);
-      
-      setFixedScaleCenter(roundedCurrentCenter);
-      setFixedScaleRange({ scaleMin: initialScaleMin, scaleMax: initialScaleMax });
-      return;
-    }
-
-    // Check if current price deviates by more than threshold from fixed center
-    const deviation = Math.abs(lastPrice - fixedScaleCenter);
-    if (deviation > deviationThreshold) {
-      // Recenter the scale - keep the same range size
-      setFixedScaleRange(prevRange => {
-        if (prevRange.scaleMin === null || prevRange.scaleMax === null) {
-          // Fallback if range not set
-          const incrementsPerSide = 10;
-          return {
-            scaleMin: roundedCurrentCenter - (incrementsPerSide * increment),
-            scaleMax: roundedCurrentCenter + (incrementsPerSide * increment),
-          };
-        }
-        
-        const currentRange = prevRange.scaleMax - prevRange.scaleMin;
-        const incrementsPerSide = Math.ceil((currentRange / 2) / increment);
-        
-        return {
-          scaleMin: roundedCurrentCenter - (incrementsPerSide * increment),
-          scaleMax: roundedCurrentCenter + (incrementsPerSide * increment),
-        };
-      });
-      
-      setFixedScaleCenter(roundedCurrentCenter);
-    }
-  }, [lastPrice, increment, deviationThreshold, fixedScaleCenter]);
-
-  // Calculate tick marks using fixed scale range
+  // Calculate tick marks using provided scale range
   const { ticks } = useMemo(() => {
-    if (fixedScaleCenter === null || fixedScaleRange.scaleMin === null || fixedScaleRange.scaleMax === null) {
+    if (!lastPrice || scaleMin === null || scaleMax === null) {
       return { ticks: [] };
     }
 
-    const roundedCenter = fixedScaleCenter;
-    const scaleMin = fixedScaleRange.scaleMin;
-    const scaleMax = fixedScaleRange.scaleMax;
+    const roundedCenter = Math.round(lastPrice / increment) * increment;
     const totalRange = scaleMax - scaleMin;
 
     // Helper function to convert price to position percentage
@@ -105,10 +57,10 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, deviationTh
     ticks.sort((a, b) => a.position - b.position);
 
     return { ticks };
-  }, [fixedScaleCenter, fixedScaleRange, increment]);
+  }, [lastPrice, scaleMin, scaleMax, increment]);
 
-  // Show loading only on initial mount when fixedScaleCenter is not set
-  if (fixedScaleCenter === null || fixedScaleRange.scaleMin === null || fixedScaleRange.scaleMax === null || ticks.length === 0) {
+  // Show loading only when scale range is not available
+  if (scaleMin === null || scaleMax === null || ticks.length === 0) {
     return (
       <div className="relative w-full h-14 border-b-2 border-arcade-white bg-arcade-dark z-20 flex items-center justify-center">
         <div className="text-arcade-gray text-xs font-arcade">Loading price scale...</div>
@@ -116,9 +68,7 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, deviationTh
     );
   }
 
-  // Calculate position of current price on the fixed scale
-  const scaleMin = fixedScaleRange.scaleMin;
-  const scaleMax = fixedScaleRange.scaleMax;
+  // Calculate position of current price on the scale
   const totalRange = scaleMax - scaleMin;
   const currentPricePosition = lastPrice && totalRange > 0 
     ? Math.max(0, Math.min(100, ((lastPrice - scaleMin) / totalRange) * 100))
@@ -137,10 +87,10 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, deviationTh
             className="absolute top-0 bottom-0 transform -translate-x-1/2 z-30"
             style={{ left: `${currentPricePosition}%` }}
           >
-            {/* Yellow center line */}
-            <div className="absolute top-0 bottom-0 w-0.5 bg-arcade-yellow" />
+            {/* Yellow center line - only extends above the ruler line */}
+            <div className="absolute top-0 bottom-1/2 w-0.5 bg-arcade-yellow" />
             {/* Current price label */}
-            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 whitespace-nowrap">
+            <div className="absolute bottom-1/2 left-1/2 transform -translate-x-1/2 mb-6 whitespace-nowrap">
               <div className="bg-arcade-yellow text-arcade-bg px-2 py-1 text-sm font-arcade font-bold">
                 {lastPrice.toFixed(2)}
               </div>

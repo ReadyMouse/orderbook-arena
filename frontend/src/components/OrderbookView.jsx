@@ -20,6 +20,9 @@ function OrderbookView({ orderbookState }) {
   const arenaRef = useRef(null);
   const [arenaHeight, setArenaHeight] = useState(600); // Default height
   
+  // User-controlled price increment for ruler/intervals
+  const [priceIncrement, setPriceIncrement] = useState(10);
+  
   // Measure arena height on mount and resize
   useEffect(() => {
     if (!arenaRef.current) return;
@@ -235,10 +238,33 @@ function OrderbookView({ orderbookState }) {
     return `${bidsKey}|${asksKey}`;
   }, [bids, asks]);
 
-  // Calculate volume for each $10 price interval using ALL orders (not just limited)
-  // Uses the same positioning logic as field lines to align with price scale
-  const intervalVolumes = useMemo(() => {
+  // Calculate the shared scale range used by PriceScale, field lines, and volume intervals
+  // This ensures all components use the same positioning
+  const scaleRange = useMemo(() => {
     if (!effectiveLastPrice || !minPrice || !maxPrice || minPrice === maxPrice) {
+      return { scaleMin: null, scaleMax: null, roundedCenter: null };
+    }
+
+    const increment = priceIncrement;
+    const roundedCenter = Math.round(effectiveLastPrice / increment) * increment;
+    
+    // Cap incrementsPerSide to keep scale readable at small increments
+    const leftRange = effectiveLastPrice - minPrice;
+    const rightRange = maxPrice - effectiveLastPrice;
+    const maxRange = Math.max(leftRange, rightRange);
+    const maxIncrementsFromData = Math.ceil(maxRange / increment) + 2;
+    const incrementsPerSide = Math.min(Math.max(5, maxIncrementsFromData), 15); // Cap at 15 per side
+    
+    const scaleMin = roundedCenter - (incrementsPerSide * increment);
+    const scaleMax = roundedCenter + (incrementsPerSide * increment);
+    
+    return { scaleMin, scaleMax, roundedCenter };
+  }, [effectiveLastPrice, minPrice, maxPrice, priceIncrement]);
+
+  // Calculate volume for each price interval using ALL orders (not just limited)
+  // Uses the shared scaleRange to ensure alignment with PriceScale
+  const intervalVolumes = useMemo(() => {
+    if (!scaleRange.scaleMin || !scaleRange.scaleMax) {
       return new Map();
     }
 
@@ -247,17 +273,8 @@ function OrderbookView({ orderbookState }) {
       return new Map();
     }
 
-    const increment = 10;
-    const roundedCenter = Math.round(effectiveLastPrice / increment) * increment;
-    
-    // Use the SAME calculation as field lines to ensure alignment
-    const leftRange = effectiveLastPrice - minPrice;
-    const rightRange = maxPrice - effectiveLastPrice;
-    const maxRange = Math.max(leftRange, rightRange);
-    const incrementsPerSide = Math.max(5, Math.ceil(maxRange / increment) + 2);
-    
-    const scaleMin = roundedCenter - (incrementsPerSide * increment);
-    const scaleMax = roundedCenter + (incrementsPerSide * increment);
+    const increment = priceIncrement;
+    const { scaleMin, scaleMax, roundedCenter } = scaleRange;
     const totalRange = scaleMax - scaleMin;
     
     const priceToPosition = (price) => {
@@ -342,7 +359,7 @@ function OrderbookView({ orderbookState }) {
     }
     
     return volumes;
-  }, [effectiveLastPrice, minPrice, maxPrice, bidsAsksKey, bids, asks]);
+  }, [scaleRange, bidsAsksKey, bids, asks, priceIncrement]);
 
   // Memoize sorted entries for stable rendering
   const sortedIntervalEntries = useMemo(() => {
@@ -401,18 +418,42 @@ function OrderbookView({ orderbookState }) {
     <div className="relative w-full h-full bg-arcade-dark flex flex-col">
       {/* Price Scale Header - always show if we have any price data */}
       <div className="flex-shrink-0 relative">
-        {effectiveLastPrice && minPrice != null && maxPrice != null ? (
+        {effectiveLastPrice && minPrice != null && maxPrice != null && scaleRange.scaleMin != null ? (
           <PriceScale
             lastPrice={effectiveLastPrice}
             minPrice={minPrice}
             maxPrice={maxPrice}
-            increment={10}
+            increment={priceIncrement}
+            scaleMin={scaleRange.scaleMin}
+            scaleMax={scaleRange.scaleMax}
           />
         ) : (
           <div className="relative w-full h-16 border-b-2 border-arcade-white bg-arcade-dark flex items-center justify-center">
             <div className="text-arcade-gray text-xs font-arcade">Waiting for price data...</div>
           </div>
         )}
+      </div>
+      
+      {/* Controls Panel */}
+      <div className="flex-shrink-0 bg-arcade-dark border-b border-arcade-gray/30 px-4 py-2">
+        <div className="flex items-center gap-4">
+          <span className="text-xs font-arcade text-arcade-gray">Price Spacing:</span>
+          <div className="flex gap-2">
+            {[0.01, 0.1, 1, 5, 10].map((increment) => (
+              <button
+                key={increment}
+                onClick={() => setPriceIncrement(increment)}
+                className={`px-3 py-1 text-xs font-arcade rounded transition-colors ${
+                  priceIncrement === increment
+                    ? 'bg-arcade-yellow text-arcade-dark'
+                    : 'bg-arcade-gray/20 text-arcade-gray hover:bg-arcade-gray/30'
+                }`}
+              >
+                ${increment}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
       
       {/* Football Field - unified visualization area */}
@@ -425,21 +466,10 @@ function OrderbookView({ orderbookState }) {
             </div>
           </div>
         )}
-        {/* Football field lines - extending from scale tick marks (using same $10 increments) */}
-        {effectiveLastPrice && minPrice && maxPrice && (() => {
-          const increment = 10; // Match PriceScale increment
-          
-          // Round center to nearest increment (same as PriceScale)
-          const roundedCenter = Math.round(effectiveLastPrice / increment) * increment;
-          
-          // Calculate range needed
-          const leftRange = effectiveLastPrice - minPrice;
-          const rightRange = maxPrice - effectiveLastPrice;
-          const maxRange = Math.max(leftRange, rightRange);
-          const incrementsPerSide = Math.max(5, Math.ceil(maxRange / increment) + 2);
-          
-          const scaleMin = roundedCenter - (incrementsPerSide * increment);
-          const scaleMax = roundedCenter + (incrementsPerSide * increment);
+        {/* Football field lines - extending from scale tick marks */}
+        {scaleRange.scaleMin != null && scaleRange.scaleMax != null && (() => {
+          const increment = priceIncrement;
+          const { scaleMin, scaleMax, roundedCenter } = scaleRange;
           const totalRange = scaleMax - scaleMin;
           
           const priceToPosition = (price) => {
