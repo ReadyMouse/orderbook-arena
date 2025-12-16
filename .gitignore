@@ -50,3 +50,4 @@ frontend.log
 ## AI 
 ai-dev-tasks-main/*
 images_movies/*
+ignore_movies/*
