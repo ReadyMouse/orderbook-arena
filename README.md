@@ -25,7 +25,6 @@ Traditional orderbook displays are intimidating walls of numbers. This visualize
 - Dynamic centerline tracking last traded price
 - Multiple trading pairs
 
-
 ## 🏗️ Architecture
 
 ```
@@ -134,4 +133,4 @@ Press `Ctrl+C` to stop both services.
 
 ## Notes
 
-Built by Mylo Benett aka Ready Mouse for Kraken Forge Hackathon Dec 2025
+Built by Mylo Bennett aka Ready Mouse for Kraken Forge Hackathon Dec 2025
