@@ -47,7 +47,7 @@ function App() {
   } = timeTravel;
 
   // WebSocket hook - pause updates when in time-travel mode, pass selected ticker
-  const { orderbookState, error, isConnected } = useWebSocket(isTimeTravelMode, selectedTicker);
+  const { orderbookState, ohlcData, error, isConnected } = useWebSocket(isTimeTravelMode, selectedTicker);
 
   // Fetch history range when ticker changes
   useEffect(() => {
@@ -179,6 +179,11 @@ function App() {
             ))}
           </select>
         </div>
+        <div className="flex justify-center mb-2">
+          <p className="text-sm font-arcade text-arcade-gray italic">
+            Watch the Players Battle over the Price
+          </p>
+        </div>
         
         {/* Health Meters - upper left corner */}
         {displayOrderbook && (buyerPercent > 0 || sellerPercent > 0) && (
@@ -290,7 +295,7 @@ function App() {
       {/* Main visualization area */}
       <main className="flex-1 p-4">
         <div className="w-full h-[calc(100vh-200px)] border-2 border-arcade-white">
-          <OrderbookView orderbookState={displayOrderbook} />
+          <OrderbookView orderbookState={displayOrderbook} ohlcData={ohlcData} />
         </div>
       </main>
 

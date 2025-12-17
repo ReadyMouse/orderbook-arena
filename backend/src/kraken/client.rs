@@ -1,5 +1,5 @@
 use crate::kraken::types::{
-    BookMessage, SubscriptionRequest, SubscriptionStatus,
+    BookMessage, OhlcMessage, SubscriptionRequest, SubscriptionStatus,
 };
 use anyhow::{Context, Result, bail};
 use futures_util::{SinkExt, StreamExt};
@@ -101,6 +101,7 @@ impl KrakenConnection {
             subscription: crate::kraken::types::SubscriptionDetails {
                 name: "book".to_string(),
                 depth,
+                interval: None,
             },
         };
 
@@ -119,6 +120,45 @@ impl KrakenConnection {
     pub async fn subscribe_zec_usd(&mut self) -> Result<()> {
         self.subscribe_book(DEFAULT_TRADING_PAIR, Some(DEFAULT_BOOK_DEPTH))
             .await
+    }
+
+    /// Subscribe to the OHLC (candlestick) channel for a trading pair
+    /// 
+    /// # Arguments
+    /// 
+    /// * `pair` - Trading pair (e.g., "ZEC/USD")
+    /// * `interval` - Candle interval in minutes (1, 5, 15, 30, 60, 240, 1440, 10080, 21600)
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - Subscription request cannot be serialized
+    /// - Message cannot be sent over the WebSocket connection
+    /// - Connection is closed or lost
+    pub async fn subscribe_ohlc(
+        &mut self,
+        pair: &str,
+        interval: u32,
+    ) -> Result<()> {
+        let subscription = SubscriptionRequest {
+            event: "subscribe".to_string(),
+            pair: vec![pair.to_string()],
+            subscription: crate::kraken::types::SubscriptionDetails {
+                name: "ohlc".to_string(),
+                depth: None,
+                interval: Some(interval),
+            },
+        };
+
+        let message = serde_json::to_string(&subscription)
+            .context("Failed to serialize OHLC subscription request: invalid subscription data")?;
+
+        self.write
+            .send(Message::Text(message))
+            .await
+            .context("Failed to send OHLC subscription request: connection may be closed")?;
+
+        Ok(())
     }
 
     /// Receive the next message from the WebSocket
@@ -164,17 +204,35 @@ impl KrakenConnection {
                     return Ok(Some(KrakenMessage::SubscriptionStatus(status)));
                 }
 
-                // Try to parse as book message (array format)
-                if let Ok(book_msg) = serde_json::from_value::<BookMessage>(json_value) {
-                    return Ok(Some(KrakenMessage::Book(book_msg)));
+                // Try to parse as array message (could be book or OHLC)
+                // Distinguish by checking the channel name (arr[2])
+                if let Some(arr) = json_value.as_array() {
+                    if arr.len() >= 3 {
+                        if let Some(channel_name) = arr[2].as_str() {
+                            if channel_name.starts_with("ohlc") {
+                                // OHLC message
+                                if let Ok(ohlc_msg) = serde_json::from_value::<OhlcMessage>(json_value.clone()) {
+                                    return Ok(Some(KrakenMessage::Ohlc(ohlc_msg)));
+                                }
+                            } else if channel_name.starts_with("book") {
+                                // Book message
+                                if let Ok(book_msg) = serde_json::from_value::<BookMessage>(json_value.clone()) {
+                                    return Ok(Some(KrakenMessage::Book(book_msg)));
+                                }
+                            }
+                        }
+                    }
                 }
 
                 // If we can't parse it as a known message type, log and return None
                 // This allows the system to continue processing other messages
-                eprintln!(
-                    "Warning: Received unparseable message from Kraken (not subscription or book): {}",
-                    if text.len() > 200 { format!("{}...", &text[..200]) } else { text }
-                );
+                // Skip logging heartbeat messages
+                if !text.contains("\"event\":\"heartbeat\"") {
+                    eprintln!(
+                        "Warning: Received unparseable message from Kraken (not subscription, book, or ohlc): {}",
+                        if text.len() > 200 { format!("{}...", &text[..200]) } else { text }
+                    );
+                }
                 Ok(None)
             }
             Some(Ok(Message::Close(close_frame))) => {
@@ -234,6 +292,7 @@ impl KrakenConnection {
 pub enum KrakenMessage {
     SubscriptionStatus(SubscriptionStatus),
     Book(BookMessage),
+    Ohlc(OhlcMessage),
     Close,
 }
 

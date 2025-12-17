@@ -11,7 +11,18 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::broadcast;
 use crate::api::routes::AppState;
 use crate::orderbook::engine::OrderbookState;
-use serde::Deserialize;
+use crate::kraken::types::OhlcData;
+use serde::{Deserialize, Serialize};
+
+/// WebSocket message wrapper to distinguish between different data types
+#[derive(Debug, Serialize)]
+#[serde(tag = "type")]
+enum WebSocketMessage {
+    #[serde(rename = "orderbook")]
+    Orderbook { data: OrderbookState },
+    #[serde(rename = "ohlc")]
+    Ohlc { data: OhlcData },
+}
 
 #[derive(Debug, Deserialize)]
 pub struct WebSocketQuery {
@@ -50,9 +61,11 @@ async fn handle_socket(socket: axum::extract::ws::WebSocket, state: AppState, ti
         let mut tickers = state.tickers.lock().await;
         tickers.entry(ticker.clone()).or_insert_with(|| {
             eprintln!("Creating new ticker data for: {}", ticker);
-            let (tx, _) = broadcast::channel::<OrderbookState>(100);
+            let (orderbook_tx, _) = broadcast::channel::<OrderbookState>(100);
+            let (ohlc_tx, _) = broadcast::channel::<OhlcData>(100);
             crate::api::routes::TickerData {
-                orderbook_updates: tx,
+                orderbook_updates: orderbook_tx,
+                ohlc_updates: ohlc_tx,
                 engine: std::sync::Arc::new(tokio::sync::RwLock::new(
                     crate::orderbook::engine::OrderbookEngine::new()
                 )),
@@ -70,7 +83,8 @@ async fn handle_socket(socket: axum::extract::ws::WebSocket, state: AppState, ti
     
     // Send initial state if orderbook has data
     if !current_state.bids.is_empty() || !current_state.asks.is_empty() {
-        if let Ok(json) = serde_json::to_string(&current_state) {
+        let message = WebSocketMessage::Orderbook { data: current_state };
+        if let Ok(json) = serde_json::to_string(&message) {
             eprintln!("Sending initial state to client for ticker {}", ticker);
             if let Err(e) = sender.send(Message::Text(json)).await {
                 eprintln!("Error sending initial state: {}", e);
@@ -82,18 +96,50 @@ async fn handle_socket(socket: axum::extract::ws::WebSocket, state: AppState, ti
     }
     
     // Subscribe to orderbook updates for this ticker
-    let mut rx = ticker_data.orderbook_updates.subscribe();
+    let mut orderbook_rx = ticker_data.orderbook_updates.subscribe();
+    // Subscribe to OHLC updates for this ticker
+    let mut ohlc_rx = ticker_data.ohlc_updates.subscribe();
     
     loop {
         tokio::select! {
             // Handle incoming orderbook updates
-            result = rx.recv() => {
+            result = orderbook_rx.recv() => {
                 match result {
                     Ok(orderbook_state) => {
-                        let json = match serde_json::to_string(&orderbook_state) {
+                        let message = WebSocketMessage::Orderbook { data: orderbook_state };
+                        let json = match serde_json::to_string(&message) {
                             Ok(json) => json,
                             Err(e) => {
                                 eprintln!("Error serializing orderbook state: {}", e);
+                                continue;
+                            }
+                        };
+                        
+                        if sender.send(Message::Text(json)).await.is_err() {
+                            // Client disconnected
+                            break;
+                        }
+                    }
+                    Err(broadcast::error::RecvError::Lagged(_)) => {
+                        // We lagged behind, skip this update
+                        continue;
+                    }
+                    Err(broadcast::error::RecvError::Closed) => {
+                        // Broadcast channel closed
+                        break;
+                    }
+                }
+            }
+            
+            // Handle incoming OHLC updates
+            result = ohlc_rx.recv() => {
+                match result {
+                    Ok(ohlc_data) => {
+                        let message = WebSocketMessage::Ohlc { data: ohlc_data };
+                        let json = match serde_json::to_string(&message) {
+                            Ok(json) => json,
+                            Err(e) => {
+                                eprintln!("Error serializing OHLC data: {}", e);
                                 continue;
                             }
                         };

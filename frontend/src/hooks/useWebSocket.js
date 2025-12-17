@@ -6,10 +6,11 @@ const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:8080/live';
  * Custom hook for managing WebSocket connection to the backend
  * @param {boolean} pauseUpdates - If true, WebSocket messages won't update orderbookState (connection stays alive)
  * @param {string} ticker - Trading pair symbol (e.g., 'ZEC', 'BTC', 'ETH', 'XMR')
- * @returns {Object} { orderbookState, error, isConnected }
+ * @returns {Object} { orderbookState, ohlcData, error, isConnected }
  */
 export function useWebSocket(pauseUpdates = false, ticker = 'ZEC') {
   const [orderbookState, setOrderbookState] = useState(null);
+  const [ohlcData, setOhlcData] = useState(null);
   const [error, setError] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef(null);
@@ -47,7 +48,17 @@ export function useWebSocket(pauseUpdates = false, ticker = 'ZEC') {
         }
         
         try {
-          const data = JSON.parse(event.data);
+          const message = JSON.parse(event.data);
+          
+          // Handle different message types
+          if (message.type === 'ohlc') {
+            // OHLC candlestick data
+            setOhlcData(message.data);
+            return;
+          }
+          
+          // Handle orderbook data (either with type wrapper or legacy format)
+          const data = message.type === 'orderbook' ? message.data : message;
           
           if (data && (data.bids || data.asks)) {
             const accumulated = accumulatedOrderbookRef.current;
@@ -236,6 +247,6 @@ export function useWebSocket(pauseUpdates = false, ticker = 'ZEC') {
   // Return last valid state if current state is null (to prevent flashing during reconnects)
   const displayState = orderbookState || lastValidStateRef.current;
   
-  return { orderbookState: displayState, error, isConnected };
+  return { orderbookState: displayState, ohlcData, error, isConnected };
 }
 

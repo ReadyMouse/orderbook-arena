@@ -119,7 +119,7 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
             {/* Current price label */}
             <div className="absolute bottom-1/2 left-1/2 transform -translate-x-1/2 mb-6 whitespace-nowrap">
               <div className={`bg-arcade-yellow text-arcade-bg px-2 py-1 ${currentPriceFontSize} font-arcade font-bold`}>
-                ${increment < 1 ? lastPrice.toFixed(2) : lastPrice.toFixed(0)}
+                Last Price: ${increment < 1 ? lastPrice.toFixed(2) : lastPrice.toFixed(0)}
               </div>
             </div>
           </div>

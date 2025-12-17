@@ -13,6 +13,8 @@ pub struct SubscriptionDetails {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub depth: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub interval: Option<u32>,
 }
 
 /// Subscription status response from Kraken
@@ -32,6 +34,7 @@ pub struct SubscriptionStatus {
 pub struct SubscriptionDetailsResponse {
     pub name: String,
     pub depth: Option<u32>,
+    pub interval: Option<u32>,
 }
 
 /// Price level in the orderbook
@@ -69,6 +72,39 @@ pub struct BookDelta {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 pub enum BookMessage {
+    /// Array format: [channelID, data, channelName, pair]
+    ArrayFormat(Vec<serde_json::Value>),
+}
+
+/// OHLC (candlestick) data from Kraken
+/// Format: [channelID, [time, etime, open, high, low, close, vwap, volume, count], "ohlc-1", "ZEC/USD"]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OhlcData {
+    /// Begin time of the candle (timestamp)
+    pub time: f64,
+    /// End time of the candle (timestamp)
+    pub etime: f64,
+    /// Opening price
+    pub open: f64,
+    /// Highest price
+    pub high: f64,
+    /// Lowest price
+    pub low: f64,
+    /// Closing price
+    pub close: f64,
+    /// Volume weighted average price
+    pub vwap: f64,
+    /// Volume
+    pub volume: f64,
+    /// Number of trades
+    pub count: u64,
+}
+
+/// OHLC message as received from Kraken
+/// Format: [channelID, [time, etime, open, high, low, close, vwap, volume, count], "ohlc-1", "ZEC/USD"]
+#[derive(Debug, Deserialize)]
+#[serde(untagged)]
+pub enum OhlcMessage {
     /// Array format: [channelID, data, channelName, pair]
     ArrayFormat(Vec<serde_json::Value>),
 }
@@ -155,6 +191,64 @@ pub fn parse_book_snapshot(value: &serde_json::Value) -> Result<BookSnapshot, an
 pub fn parse_book_delta(value: &serde_json::Value) -> Result<BookDelta, anyhow::Error> {
     let delta: BookDelta = serde_json::from_value(value.clone())?;
     Ok(delta)
+}
+
+/// Helper function to parse OHLC data from JSON value
+/// Format: [time, etime, open, high, low, close, vwap, volume, count]
+pub fn parse_ohlc_data(value: &serde_json::Value) -> Result<OhlcData, anyhow::Error> {
+    let arr = value.as_array()
+        .ok_or_else(|| anyhow::anyhow!("OHLC data must be an array"))?;
+    
+    if arr.len() < 9 {
+        return Err(anyhow::anyhow!("OHLC data array must have at least 9 elements, got {}", arr.len()));
+    }
+
+    let time = arr[0].as_str()
+        .ok_or_else(|| anyhow::anyhow!("time must be a string"))?
+        .parse::<f64>()?;
+    
+    let etime = arr[1].as_str()
+        .ok_or_else(|| anyhow::anyhow!("etime must be a string"))?
+        .parse::<f64>()?;
+    
+    let open = arr[2].as_str()
+        .ok_or_else(|| anyhow::anyhow!("open must be a string"))?
+        .parse::<f64>()?;
+    
+    let high = arr[3].as_str()
+        .ok_or_else(|| anyhow::anyhow!("high must be a string"))?
+        .parse::<f64>()?;
+    
+    let low = arr[4].as_str()
+        .ok_or_else(|| anyhow::anyhow!("low must be a string"))?
+        .parse::<f64>()?;
+    
+    let close = arr[5].as_str()
+        .ok_or_else(|| anyhow::anyhow!("close must be a string"))?
+        .parse::<f64>()?;
+    
+    let vwap = arr[6].as_str()
+        .ok_or_else(|| anyhow::anyhow!("vwap must be a string"))?
+        .parse::<f64>()?;
+    
+    let volume = arr[7].as_str()
+        .ok_or_else(|| anyhow::anyhow!("volume must be a string"))?
+        .parse::<f64>()?;
+    
+    let count = arr[8].as_u64()
+        .ok_or_else(|| anyhow::anyhow!("count must be a number"))?;
+
+    Ok(OhlcData {
+        time,
+        etime,
+        open,
+        high,
+        low,
+        close,
+        vwap,
+        volume,
+        count,
+    })
 }
 
 #[cfg(test)]

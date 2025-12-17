@@ -10,7 +10,7 @@ use tokio::net::TcpListener;
 use tokio::sync::{broadcast, RwLock, Mutex};
 use crate::api::routes::{AppState, TickerData};
 use crate::kraken::client::{KrakenClient, KrakenMessage};
-use crate::kraken::types::{BookMessage, BookSnapshot, BookDelta, parse_book_snapshot, parse_book_delta};
+use crate::kraken::types::{OhlcData, OhlcMessage, parse_book_snapshot, parse_book_delta, parse_ohlc_data};
 use crate::orderbook::engine::OrderbookEngine;
 use crate::orderbook::store::SnapshotStore;
 use crate::orderbook::integration::start_snapshot_storage_task;
@@ -27,7 +27,7 @@ fn ticker_to_pair(ticker: &str) -> String {
 }
 
 /// Start a Kraken connection for a specific ticker
-fn start_kraken_task(ticker: String, ticker_data: TickerData, book_depth: u32) {
+fn start_kraken_task(ticker: String, ticker_data: TickerData, book_depth: u32, ohlc_interval: u32) {
     tokio::spawn(async move {
         let client = KrakenClient::new();
         let trading_pair = ticker_to_pair(&ticker);
@@ -41,6 +41,13 @@ fn start_kraken_task(ticker: String, ticker_data: TickerData, book_depth: u32) {
                     // Subscribe to book channel
                     if let Err(e) = connection.subscribe_book(&trading_pair, Some(book_depth)).await {
                         eprintln!("Failed to subscribe to book channel for {}: {}", ticker, e);
+                        tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                        continue;
+                    }
+                    
+                    // Subscribe to OHLC channel
+                    if let Err(e) = connection.subscribe_ohlc(&trading_pair, ohlc_interval).await {
+                        eprintln!("Failed to subscribe to OHLC channel for {}: {}", ticker, e);
                         tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
                         continue;
                     }
@@ -91,6 +98,20 @@ fn start_kraken_task(ticker: String, ticker_data: TickerData, book_depth: u32) {
                                     }
                                 }
                             }
+                            Ok(Some(KrakenMessage::Ohlc(ohlc_msg))) => {
+                                // Parse and broadcast OHLC data
+                                let OhlcMessage::ArrayFormat(arr) = ohlc_msg;
+                                if arr.len() >= 2 {
+                                    match parse_ohlc_data(&arr[1]) {
+                                        Ok(ohlc_data) => {
+                                            let _ = ticker_data.ohlc_updates.send(ohlc_data);
+                                        }
+                                        Err(e) => {
+                                            eprintln!("[{}] Error parsing OHLC data: {}", ticker, e);
+                                        }
+                                    }
+                                }
+                            }
                             Ok(Some(KrakenMessage::SubscriptionStatus(status))) => {
                                 eprintln!("[{}] Subscription status: {:?}", ticker, status);
                             }
@@ -132,9 +153,11 @@ async fn main() -> anyhow::Result<()> {
     for ticker in supported_tickers {
         let engine = Arc::new(RwLock::new(OrderbookEngine::new()));
         let (orderbook_updates_tx, _) = broadcast::channel::<crate::orderbook::engine::OrderbookState>(100);
+        let (ohlc_updates_tx, _) = broadcast::channel::<OhlcData>(100);
         
         let ticker_data = TickerData {
             orderbook_updates: orderbook_updates_tx,
+            ohlc_updates: ohlc_updates_tx,
             engine: engine.clone(),
         };
         
@@ -144,8 +167,8 @@ async fn main() -> anyhow::Result<()> {
             tickers.insert(ticker.to_string(), ticker_data.clone());
         }
         
-                // Start Kraken connection task for this ticker  
-                start_kraken_task(ticker.to_string(), ticker_data.clone(), config.book_depth);
+        // Start Kraken connection task for this ticker with 1-minute OHLC as default
+        start_kraken_task(ticker.to_string(), ticker_data.clone(), config.book_depth, 1);
         
         // Start snapshot storage task for this ticker
         start_snapshot_storage_task(ticker.to_string(), engine.clone(), snapshot_store.clone(), config.clone());

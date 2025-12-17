@@ -1,7 +1,10 @@
 import { useMemo, useCallback, memo, useRef, useState, useEffect } from 'react';
 import PriceScale from './PriceScale';
+import CandleDisplay from './CandleDisplay';
+import { useAggregatedCandle } from '../hooks/useAggregatedCandle';
 import pacManIcon from '../assets/pac-man.png';
 import spaceInvaderIcon from '../assets/space_invader.png';
+import candlesticksIcon from '../assets/candle_own.png';
 
 /**
  * Main container component for the orderbook visualization
@@ -12,7 +15,7 @@ import spaceInvaderIcon from '../assets/space_invader.png';
  * - Centerline representing the last traded price
  */
 
-function OrderbookView({ orderbookState }) {
+function OrderbookView({ orderbookState, ohlcData }) {
   // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // This ensures hooks are always called in the same order
   
@@ -22,6 +25,16 @@ function OrderbookView({ orderbookState }) {
   
   // User-controlled price increment for ruler/intervals
   const [priceIncrement, setPriceIncrement] = useState(10);
+  
+  // User-controlled candle timeframe (in minutes)
+  const [candleTimeframe, setCandleTimeframe] = useState(1);
+  
+  // Animation state for laser battles when centerline shifts
+  const [laserAnimation, setLaserAnimation] = useState(null);
+  const previousCenterRef = useRef(null);
+  
+  // Aggregate OHLC data based on selected timeframe
+  const displayCandle = useAggregatedCandle(ohlcData, candleTimeframe);
   
   // Measure arena height on mount and resize
   useEffect(() => {
@@ -378,6 +391,66 @@ function OrderbookView({ orderbookState }) {
     return Array.from(intervalVolumes.entries()).sort((a, b) => a[0] - b[0]);
   }, [intervalVolumes]);
 
+  // Detect when centerline shifts and trigger laser animation
+  useEffect(() => {
+    if (scaleRange.roundedCenter == null) return;
+    
+    const currentCenter = scaleRange.roundedCenter;
+    const prevCenter = previousCenterRef.current;
+    
+    // Initialize on first run
+    if (prevCenter === null) {
+      previousCenterRef.current = currentCenter;
+      return;
+    }
+    
+    // Check if center has shifted
+    if (currentCenter !== prevCenter && sortedIntervalEntries.length > 0) {
+      // Determine which side won (price moved toward them)
+      const priceMovedRight = currentCenter > prevCenter; // Buyers winning (price rising)
+      
+      // Find frontmost columns (closest to center on each side)
+      let leftmostColumn = null;
+      let rightmostColumn = null;
+      
+      sortedIntervalEntries.forEach(([price, data]) => {
+        if (data.isLeft) {
+          // Left side buyer - find the rightmost (closest to center)
+          if (!leftmostColumn || data.position > leftmostColumn.position) {
+            leftmostColumn = { price, ...data };
+          }
+        } else {
+          // Right side seller - find the leftmost (closest to center)
+          if (!rightmostColumn || data.position < rightmostColumn.position) {
+            rightmostColumn = { price, ...data };
+          }
+        }
+      });
+      
+      // Trigger animation if we have both sides
+      if (leftmostColumn && rightmostColumn) {
+        const winningSide = priceMovedRight ? 'buyers' : 'sellers';
+        const attackerColumn = priceMovedRight ? leftmostColumn : rightmostColumn;
+        const victimColumn = priceMovedRight ? rightmostColumn : leftmostColumn;
+        
+        setLaserAnimation({
+          winningSide,
+          attackerPosition: attackerColumn.position,
+          victimPosition: victimColumn.position,
+          victimPrice: victimColumn.price,
+          timestamp: Date.now(),
+        });
+        
+        // Clear animation after completion (0.5s laser + 1s blink/fade)
+        setTimeout(() => {
+          setLaserAnimation(null);
+        }, 1500);
+      }
+    }
+    
+    previousCenterRef.current = currentCenter;
+  }, [scaleRange.roundedCenter, sortedIntervalEntries]);
+
   // Calculate dynamic scale based on max volume and available height
   const { maxVolume, volumePerIcon, maxIconCount } = useMemo(() => {
     if (sortedIntervalEntries.length === 0 || arenaHeight === 0) {
@@ -447,28 +520,67 @@ function OrderbookView({ orderbookState }) {
       
       {/* Controls Panel */}
       <div className="flex-shrink-0 bg-arcade-dark border-b border-arcade-gray/30 px-4 py-2">
-        <div className="flex items-center gap-4">
-          <span className="text-xs font-arcade text-arcade-gray">Price Spacing:</span>
-          <div className="flex gap-2">
-            {[0.01, 0.1, 1, 5, 10, 100, 1000, 10000].map((increment) => (
-              <button
-                key={increment}
-                onClick={() => setPriceIncrement(increment)}
-                className={`px-3 py-1 text-xs font-arcade rounded transition-colors ${
-                  priceIncrement === increment
-                    ? 'bg-arcade-yellow text-arcade-dark'
-                    : 'bg-arcade-gray/20 text-arcade-gray hover:bg-arcade-gray/30'
-                }`}
-              >
-                ${increment >= 1000 ? `${increment / 1000}k` : increment}
-              </button>
-            ))}
+        <div className="flex items-center justify-between">
+          {/* Price Spacing Controls */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-arcade text-arcade-gray">Price Spacing:</span>
+            <div className="flex gap-2">
+              {[0.01, 0.1, 1, 5, 10, 100, 1000, 10000].map((increment) => (
+                <button
+                  key={increment}
+                  onClick={() => setPriceIncrement(increment)}
+                  className={`px-3 py-1 text-xs font-arcade rounded transition-colors ${
+                    priceIncrement === increment
+                      ? 'bg-arcade-yellow text-arcade-dark'
+                      : 'bg-arcade-gray/20 text-arcade-gray hover:bg-arcade-gray/30'
+                  }`}
+                >
+                  ${increment >= 1000 ? `${increment / 1000}k` : increment}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          {/* Candle Timeframe Controls */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-arcade text-arcade-gray">Current Candle:</span>
+            <div className="flex gap-2">
+              {[
+                { label: '1m', value: 1 },
+                { label: '5m', value: 5 },
+                { label: '15m', value: 15 },
+                { label: '1hr', value: 60 },
+              ].map(({ label, value }) => (
+                <button
+                  key={value}
+                  onClick={() => setCandleTimeframe(value)}
+                  className={`px-3 py-1 text-xs font-arcade rounded transition-colors ${
+                    candleTimeframe === value
+                      ? 'bg-arcade-blue text-arcade-dark'
+                      : 'bg-arcade-gray/20 text-arcade-gray hover:bg-arcade-gray/30'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+            <img src={candlesticksIcon} alt="candlestick" className="h-6 w-auto opacity-70" />
           </div>
         </div>
       </div>
       
       {/* Football Field - unified visualization area */}
       <div ref={arenaRef} className="relative flex-1 overflow-auto bg-arcade-dark">
+        {/* Candle Display - at the very top */}
+        {displayCandle && scaleRange.scaleMin != null && scaleRange.scaleMax != null && (
+          <CandleDisplay
+            ohlcData={displayCandle}
+            scaleMin={scaleRange.scaleMin}
+            scaleMax={scaleRange.scaleMax}
+            centerPrice={effectiveLastPrice}
+          />
+        )}
+        
         {/* Show message if no data */}
         {(!effectiveLastPrice || !minPrice || !maxPrice || minPrice === maxPrice || groupedLevels.length === 0) && (
           <div className="absolute inset-0 flex items-center justify-center z-30">
@@ -544,6 +656,9 @@ function OrderbookView({ orderbookState }) {
               // Use full price precision and increment in key to avoid collisions and force reset on increment change
               const columnKey = `col-${priceIncrement}-${price.toFixed(4)}`;
               
+              // Check if this column is under attack
+              const isVictim = laserAnimation && Math.abs(price - laserAnimation.victimPrice) < 0.01;
+              
               // Debug log for rendering
               if (process.env.NODE_ENV === 'development') {
                 console.log(`Rendering column at price ${price}, position ${position.toFixed(2)}%, volume ${volume.toFixed(4)}, icons ${iconCount}, volumePerIcon ${volumePerIcon.toFixed(4)}`);
@@ -567,14 +682,14 @@ function OrderbookView({ orderbookState }) {
                           key={`${columnKey}-icon-${i}`}
                           src={pacManIcon}
                           alt="buyer"
-                          className="w-6 h-6 inline-block"
+                          className={`w-6 h-6 inline-block ${isVictim ? 'dying-icon' : ''}`}
                         />
                       ) : (
                         <img
                           key={`${columnKey}-icon-${i}`}
                           src={spaceInvaderIcon}
                           alt="seller"
-                          className="w-6 h-6 inline-block"
+                          className={`w-6 h-6 inline-block ${isVictim ? 'dying-icon' : ''}`}
                         />
                       )
                     ))}
@@ -582,6 +697,29 @@ function OrderbookView({ orderbookState }) {
                 </div>
               );
             })}
+          </div>
+        )}
+        
+        {/* Laser beams - when centerline shifts */}
+        {laserAnimation && (
+          <div className="absolute inset-0 pointer-events-none z-20">
+            {/* Horizontal laser beam from attacker to victim */}
+            <div
+              className="absolute top-1/2"
+              style={{
+                left: `${Math.min(laserAnimation.attackerPosition, laserAnimation.victimPosition)}%`,
+                width: `${Math.abs(laserAnimation.victimPosition - laserAnimation.attackerPosition)}%`,
+                transform: 'translateY(-50%)',
+              }}
+            >
+              <div 
+                className={`laser-beam ${laserAnimation.winningSide === 'buyers' ? 'laser-red' : 'laser-blue'}`}
+                style={{
+                  height: '2px',
+                  boxShadow: `0 0 10px ${laserAnimation.winningSide === 'buyers' ? '#ff4444' : '#4444ff'}`,
+                }}
+              />
+            </div>
           </div>
         )}
         

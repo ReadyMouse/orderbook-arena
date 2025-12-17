@@ -15,6 +15,7 @@ use tokio::sync::{broadcast, RwLock, Mutex};
 use crate::orderbook::store::SnapshotStore;
 use crate::orderbook::snapshot::Snapshot;
 use crate::orderbook::engine::{OrderbookState, OrderbookEngine};
+use crate::kraken::types::OhlcData;
 use crate::api::error::ApiError;
 use crate::api::websocket::handle_websocket;
 use serde_json::{json, Value};
@@ -24,6 +25,8 @@ use serde_json::{json, Value};
 pub struct TickerData {
     /// Broadcast channel for streaming orderbook updates to WebSocket clients
     pub orderbook_updates: broadcast::Sender<OrderbookState>,
+    /// Broadcast channel for streaming OHLC (candlestick) updates to WebSocket clients
+    pub ohlc_updates: broadcast::Sender<OhlcData>,
     /// Orderbook engine for getting current state
     pub engine: Arc<RwLock<OrderbookEngine>>,
 }

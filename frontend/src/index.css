@@ -36,4 +36,73 @@
   .btn-arcade:active {
     @apply shadow-none translate-x-2 translate-y-2;
   }
+  
+  /* Laser beam animations */
+  .laser-beam {
+    animation: laser-pulse 0.5s ease-in-out;
+  }
+  
+  .laser-red {
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      #ff4444 20%, 
+      #ff4444 80%, 
+      transparent 100%
+    );
+  }
+  
+  .laser-blue {
+    background: linear-gradient(90deg, 
+      transparent 0%, 
+      #4444ff 20%, 
+      #4444ff 80%, 
+      transparent 100%
+    );
+  }
+  
+  /* Dying icon animation - blink 2x then fade */
+  .dying-icon {
+    animation: dying 1s ease-in-out forwards;
+    animation-delay: 0.5s; /* Start after laser fires */
+  }
+}
+
+@keyframes laser-pulse {
+  0% {
+    opacity: 0;
+    transform: scaleX(0);
+  }
+  10% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  90% {
+    opacity: 1;
+    transform: scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scaleX(1);
+  }
+}
+
+@keyframes dying {
+  0%, 15% {
+    opacity: 1;
+  }
+  20%, 35% {
+    opacity: 0.2;
+  }
+  40%, 55% {
+    opacity: 1;
+  }
+  60%, 75% {
+    opacity: 0.2;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }

@@ -1,4 +1,5 @@
-# Orderbook Visualizer
+# Orderbook Arena
+*Watch the Players Battle over the Price*
 
 ![Banner](images_movies/Banner_final.png)
 
