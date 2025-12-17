@@ -3,17 +3,20 @@ import { useMemo } from 'react';
 /**
  * CandleDisplay Component
  * 
- * Displays a horizontal (sideways) candlestick at the top of the arena
- * that shows the current OHLC data aligned with the price scale
+ * Displays two stacked horizontal (sideways) candlesticks at the top of the arena:
+ * - Top: Last closed/completed candle
+ * - Bottom: Current in-progress candle
+ * Both aligned with the price scale
  * 
- * @param {Object} ohlcData - OHLC data with open, high, low, close, time, etime, vwap, volume, count
+ * @param {Object} currentCandle - Current (in-progress) OHLC data
+ * @param {Object} lastClosedCandle - Last completed OHLC data (optional)
  * @param {Number} scaleMin - Minimum price on the scale
  * @param {Number} scaleMax - Maximum price on the scale
  * @param {Number} centerPrice - Center price (for reference)
  */
-function CandleDisplay({ ohlcData, scaleMin, scaleMax, centerPrice }) {
-  // Calculate positions based on price scale
-  const candlePositions = useMemo(() => {
+function CandleDisplay({ currentCandle, lastClosedCandle, scaleMin, scaleMax, centerPrice }) {
+  // Calculate positions for a single candle
+  const calculateCandlePositions = (ohlcData) => {
     if (!ohlcData || scaleMin == null || scaleMax == null) {
       return null;
     }
@@ -51,43 +54,36 @@ function CandleDisplay({ ohlcData, scaleMin, scaleMax, centerPrice }) {
       bodyLeft,
       bodyWidth,
       isBullish,
-      open,
-      high,
-      low,
-      close,
     };
-  }, [ohlcData, scaleMin, scaleMax]);
+  };
 
-  if (!candlePositions) {
-    return null;
-  }
+  // Calculate positions for both candles
+  const currentPositions = useMemo(() => 
+    calculateCandlePositions(currentCandle), 
+    [currentCandle, scaleMin, scaleMax]
+  );
+  
+  const lastClosedPositions = useMemo(() => 
+    calculateCandlePositions(lastClosedCandle), 
+    [lastClosedCandle, scaleMin, scaleMax]
+  );
 
-  const {
-    highPos,
-    lowPos,
-    bodyLeft,
-    bodyWidth,
-    isBullish,
-    open,
-    high,
-    low,
-    close,
-  } = candlePositions;
+  // Helper to render a single candle
+  const renderCandle = (positions, opacity = 1) => {
+    if (!positions) return null;
 
-  // Body and wick colors - same color
-  const candleColor = isBullish ? 'bg-green-500' : 'bg-red-500';
+    const { highPos, lowPos, bodyLeft, bodyWidth, isBullish } = positions;
+    const candleColor = isBullish ? 'bg-green-500' : 'bg-red-500';
 
-  return (
-    <div className="absolute top-0 left-0 right-0 h-8 pointer-events-none z-20">
-      {/* Candlestick - horizontal layout */}
-      <div className="absolute top-1/2 left-0 right-0 transform -translate-y-1/2">
+    return (
+      <div className="absolute top-1/2 left-0 right-0 transform -translate-y-1/2" style={{ opacity }}>
         {/* Full wick line from low to high */}
         <div
           className={`absolute ${candleColor}`}
           style={{
             left: `${lowPos}%`,
             width: `${Math.max(0.1, highPos - lowPos)}%`,
-            height: '3px',
+            height: '2px',
             top: '50%',
             transform: 'translateY(-50%)',
           }}
@@ -95,14 +91,34 @@ function CandleDisplay({ ohlcData, scaleMin, scaleMax, centerPrice }) {
 
         {/* Candle body - solid box from open to close */}
         <div
-          className={`absolute h-4 ${candleColor}`}
+          className={`absolute h-3 ${candleColor}`}
           style={{
             left: `${bodyLeft}%`,
-            width: bodyWidth > 0.1 ? `${bodyWidth}%` : '3px', // Minimum width for doji
+            width: bodyWidth > 0.1 ? `${bodyWidth}%` : '2px', // Minimum width for doji
             top: '50%',
             transform: 'translateY(-50%)',
           }}
         />
+      </div>
+    );
+  };
+
+  if (!currentPositions) {
+    return null;
+  }
+
+  return (
+    <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-20">
+      {/* Last closed candle (top half) - slightly transparent */}
+      {lastClosedPositions && (
+        <div className="absolute top-0 left-0 right-0 h-8">
+          {renderCandle(lastClosedPositions, 0.7)}
+        </div>
+      )}
+      
+      {/* Current candle (bottom half) - full opacity */}
+      <div className="absolute bottom-0 left-0 right-0 h-8">
+        {renderCandle(currentPositions, 1.0)}
       </div>
     </div>
   );

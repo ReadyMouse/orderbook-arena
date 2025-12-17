@@ -34,7 +34,27 @@ function OrderbookView({ orderbookState, ohlcData }) {
   const previousCenterRef = useRef(null);
   
   // Aggregate OHLC data based on selected timeframe
-  const displayCandle = useAggregatedCandle(ohlcData, candleTimeframe);
+  // Returns both current (in-progress) and last closed candle
+  const { currentCandle: rawCurrentCandle, lastClosedCandle: rawLastClosedCandle } = useAggregatedCandle(ohlcData, candleTimeframe);
+  
+  // Update current candle's close price to match current lastPrice for accurate positioning
+  const currentCandle = useMemo(() => {
+    if (!rawCurrentCandle || !orderbookState?.lastPrice) {
+      return rawCurrentCandle;
+    }
+    
+    // Update close price to current lastPrice and adjust high/low if needed
+    const currentPrice = orderbookState.lastPrice;
+    return {
+      ...rawCurrentCandle,
+      close: currentPrice,
+      high: Math.max(rawCurrentCandle.high, currentPrice),
+      low: Math.min(rawCurrentCandle.low, currentPrice),
+    };
+  }, [rawCurrentCandle, orderbookState?.lastPrice]);
+  
+  // Last closed candle doesn't need price adjustment - it's complete
+  const lastClosedCandle = rawLastClosedCandle;
   
   // Measure arena height on mount and resize
   useEffect(() => {
@@ -264,8 +284,11 @@ function OrderbookView({ orderbookState, ohlcData }) {
     // Set to exactly 8 increments per side for consistent scale and readability
     const incrementsPerSide = 8;
     
-    const scaleMin = roundedCenter - (incrementsPerSide * increment);
-    const scaleMax = roundedCenter + (incrementsPerSide * increment);
+    // Center the scale around the ACTUAL effectiveLastPrice, not the rounded version
+    // This ensures the current price (and candle close) is always at exactly 50%
+    const rangeHalfWidth = incrementsPerSide * increment;
+    const scaleMin = effectiveLastPrice - rangeHalfWidth;
+    const scaleMax = effectiveLastPrice + rangeHalfWidth;
     
     return { scaleMin, scaleMax, roundedCenter };
   }, [effectiveLastPrice, minPrice, maxPrice, priceIncrement]);
@@ -543,7 +566,10 @@ function OrderbookView({ orderbookState, ohlcData }) {
           
           {/* Candle Timeframe Controls */}
           <div className="flex items-center gap-2">
-            <span className="text-xs font-arcade text-arcade-gray">Current Candle:</span>
+            <div className="flex flex-col text-right">
+              <span className="text-xs font-arcade text-arcade-gray">Last Candle:</span>
+              <span className="text-xs font-arcade text-arcade-gray">Current Candle:</span>
+            </div>
             <div className="flex gap-2">
               {[
                 { label: '1m', value: 1 },
@@ -571,10 +597,11 @@ function OrderbookView({ orderbookState, ohlcData }) {
       
       {/* Football Field - unified visualization area */}
       <div ref={arenaRef} className="relative flex-1 overflow-auto bg-arcade-dark">
-        {/* Candle Display - at the very top */}
-        {displayCandle && scaleRange.scaleMin != null && scaleRange.scaleMax != null && (
+        {/* Candle Display - at the very top, showing both last closed and current candles */}
+        {currentCandle && scaleRange.scaleMin != null && scaleRange.scaleMax != null && (
           <CandleDisplay
-            ohlcData={displayCandle}
+            currentCandle={currentCandle}
+            lastClosedCandle={lastClosedCandle}
             scaleMin={scaleRange.scaleMin}
             scaleMax={scaleRange.scaleMax}
             centerPrice={effectiveLastPrice}

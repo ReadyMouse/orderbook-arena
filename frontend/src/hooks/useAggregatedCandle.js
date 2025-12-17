@@ -2,27 +2,49 @@ import { useState, useEffect, useRef } from 'react';
 
 /**
  * Custom hook to aggregate 1-minute OHLC candles into higher timeframes
+ * Returns both the current (in-progress) candle and the last completed candle
  * @param {Object} ohlcData - Raw 1-minute OHLC data from WebSocket
  * @param {Number} timeframeMinutes - Target timeframe in minutes (1, 5, 15, 60, 240)
- * @returns {Object} Aggregated OHLC data for the selected timeframe
+ * @returns {Object} { currentCandle, lastClosedCandle } - Both aggregated OHLC data
  */
 export function useAggregatedCandle(ohlcData, timeframeMinutes) {
-  const [aggregatedCandle, setAggregatedCandle] = useState(null);
+  const [currentCandle, setCurrentCandle] = useState(null);
+  const [lastClosedCandle, setLastClosedCandle] = useState(null);
   const candleHistoryRef = useRef([]);
+  const completedCandlesRef = useRef([]);
   const lastTimeframeRef = useRef(timeframeMinutes);
+  const currentPeriodStartRef = useRef(null);
   
   useEffect(() => {
     if (!ohlcData) {
       return;
     }
     
-    // For 1-minute timeframe, just return the raw data immediately
-    if (timeframeMinutes === 1) {
-      setAggregatedCandle(ohlcData);
-      return;
+    // Calculate which aggregated period this candle belongs to
+    const timeframeSeconds = timeframeMinutes * 60;
+    const periodStart = Math.floor(ohlcData.time / timeframeSeconds) * timeframeSeconds;
+    
+    // Check if we've moved to a new aggregated period
+    const isNewPeriod = currentPeriodStartRef.current !== null && currentPeriodStartRef.current !== periodStart;
+    
+    if (isNewPeriod) {
+      // The previous current candle is now completed
+      if (currentCandle) {
+        setLastClosedCandle(currentCandle);
+        completedCandlesRef.current.push(currentCandle);
+        // Keep only the last few completed candles
+        if (completedCandlesRef.current.length > 10) {
+          completedCandlesRef.current.shift();
+        }
+      }
+      
+      // Clear history to start fresh for the new period
+      candleHistoryRef.current = [];
     }
     
-    // Check if we already have this candle (avoid duplicates)
+    currentPeriodStartRef.current = periodStart;
+    
+    // Check if we already have this 1-minute candle in our history (avoid duplicates)
     const lastCandle = candleHistoryRef.current[candleHistoryRef.current.length - 1];
     if (lastCandle && lastCandle.time === ohlcData.time) {
       // Update the last candle instead of adding a new one
@@ -32,8 +54,7 @@ export function useAggregatedCandle(ohlcData, timeframeMinutes) {
       candleHistoryRef.current.push(ohlcData);
     }
     
-    // Keep only candles within the timeframe window (plus a buffer)
-    const timeframeSeconds = timeframeMinutes * 60;
+    // Keep only candles within the timeframe window
     const cutoffTime = ohlcData.time - timeframeSeconds;
     
     // Filter out old candles but keep at least the last 2
@@ -44,7 +65,7 @@ export function useAggregatedCandle(ohlcData, timeframeMinutes) {
     
     const candles = candleHistoryRef.current;
     
-    // Calculate aggregated OHLC
+    // Calculate aggregated OHLC for current period
     const aggregated = {
       time: candles[0].time,
       etime: ohlcData.etime,
@@ -57,18 +78,20 @@ export function useAggregatedCandle(ohlcData, timeframeMinutes) {
       count: candles.reduce((sum, c) => sum + c.count, 0),
     };
     
-    setAggregatedCandle(aggregated);
-  }, [ohlcData, timeframeMinutes]);
+    setCurrentCandle(aggregated);
+  }, [ohlcData, timeframeMinutes, currentCandle]);
   
   // Only clear history when timeframe actually changes (not on mount)
   useEffect(() => {
     if (lastTimeframeRef.current !== timeframeMinutes) {
       candleHistoryRef.current = [];
-      // Don't clear aggregatedCandle - keep showing last candle until new one arrives
+      completedCandlesRef.current = [];
+      currentPeriodStartRef.current = null;
+      // Don't clear candles - keep showing last candles until new ones arrive
       lastTimeframeRef.current = timeframeMinutes;
     }
   }, [timeframeMinutes]);
   
-  return aggregatedCandle;
+  return { currentCandle, lastClosedCandle };
 }
 
