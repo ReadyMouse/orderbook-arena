@@ -1,10 +1,12 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
 import { useTimeTravel } from './hooks/useTimeTravel';
 import { fetchHistory } from './utils/api';
 import OrderbookView from './components/OrderbookView';
 import TimeSlider from './components/TimeSlider';
 import Controls from './components/Controls';
+import pacManIcon from './assets/pac-man.png';
+import spaceInvaderIcon from './assets/space_invader.png';
 import './App.css';
 
 // Available ticker symbols
@@ -71,6 +73,40 @@ function App() {
 
   // Determine which orderbook state to display
   const displayOrderbook = isTimeTravelMode ? historicalOrderbook : orderbookState;
+
+  // Calculate total volumes for health meters
+  const { buyerPercent, sellerPercent } = useMemo(() => {
+    if (!displayOrderbook) {
+      return { buyerPercent: 0, sellerPercent: 0 };
+    }
+
+    const bids = displayOrderbook.bids || [];
+    const asks = displayOrderbook.asks || [];
+
+    let buyerVol = 0;
+    let sellerVol = 0;
+
+    bids.forEach(bid => {
+      if (bid && typeof bid.volume === 'number') {
+        buyerVol += bid.volume;
+      }
+    });
+
+    asks.forEach(ask => {
+      if (ask && typeof ask.volume === 'number') {
+        sellerVol += ask.volume;
+      }
+    });
+
+    const totalVol = buyerVol + sellerVol;
+    const buyerPct = totalVol > 0 ? (buyerVol / totalVol) * 100 : 0;
+    const sellerPct = totalVol > 0 ? (sellerVol / totalVol) * 100 : 0;
+
+    return {
+      buyerPercent: buyerPct,
+      sellerPercent: sellerPct,
+    };
+  }, [displayOrderbook]);
 
   // Handle entering time-travel mode
   const handleEnterTimeTravel = () => {
@@ -143,6 +179,52 @@ function App() {
             ))}
           </select>
         </div>
+        
+        {/* Health Meters - upper left corner */}
+        {displayOrderbook && (buyerPercent > 0 || sellerPercent > 0) && (
+          <div className="absolute top-4 left-4 flex flex-col gap-1">
+            {/* Label */}
+            <div className="text-[10px] font-arcade text-arcade-white uppercase mb-0.5">
+              Relative Volume
+            </div>
+            
+            {/* Buyers Health Meter */}
+            <div className="flex items-center gap-2">
+              <img src={pacManIcon} alt="buyer" className="w-4 h-4" />
+              <div className="relative w-28 h-5 bg-arcade-dark border-2 border-arcade-red/60 rounded">
+                {/* Battery juice - red for buyers */}
+                <div 
+                  className="absolute top-0 left-0 h-full bg-arcade-red transition-all duration-300 rounded-sm"
+                  style={{ width: `${buyerPercent}%` }}
+                />
+                {/* Percentage text */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-[10px] font-arcade font-bold text-arcade-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                    {buyerPercent.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            {/* Sellers Health Meter */}
+            <div className="flex items-center gap-2">
+              <img src={spaceInvaderIcon} alt="seller" className="w-4 h-4" />
+              <div className="relative w-28 h-5 bg-arcade-dark border-2 border-arcade-blue/60 rounded">
+                {/* Battery juice - blue for sellers */}
+                <div 
+                  className="absolute top-0 left-0 h-full bg-arcade-blue transition-all duration-300 rounded-sm"
+                  style={{ width: `${sellerPercent}%` }}
+                />
+                {/* Percentage text */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className="text-[10px] font-arcade font-bold text-arcade-white drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]">
+                    {sellerPercent.toFixed(1)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         
         {/* Mode toggle - upper right corner */}
         <div className="absolute top-4 right-4">

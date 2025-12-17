@@ -1,5 +1,7 @@
 # Orderbook Visualizer
 
+![Banner](images_movies/Banner_final.png)
+
 A real-time cryptocurrency orderbook visualizer with time-travel functionality. Watch buyers and sellers battle for price supremacy in an intuitive, gamified interface.
 
 ![Screenshot of the Arena](images_movies/ZEC_overview_screenshot.png)
