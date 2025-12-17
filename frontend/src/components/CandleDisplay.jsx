@@ -77,7 +77,7 @@ function CandleDisplay({ currentCandle, lastClosedCandle, scaleMin, scaleMax, ce
 
     return (
       <div className="absolute top-1/2 left-0 right-0 transform -translate-y-1/2" style={{ opacity }}>
-        {/* Full wick line from low to high */}
+        {/* Full wick line from low to high - thin line on top */}
         <div
           className={`absolute ${candleColor}`}
           style={{
@@ -86,17 +86,20 @@ function CandleDisplay({ currentCandle, lastClosedCandle, scaleMin, scaleMax, ce
             height: '2px',
             top: '50%',
             transform: 'translateY(-50%)',
+            zIndex: 2,
           }}
         />
 
         {/* Candle body - solid box from open to close */}
         <div
-          className={`absolute h-3 ${candleColor}`}
+          className={`absolute ${candleColor}`}
           style={{
             left: `${bodyLeft}%`,
             width: bodyWidth > 0.1 ? `${bodyWidth}%` : '2px', // Minimum width for doji
+            height: '12px',
             top: '50%',
             transform: 'translateY(-50%)',
+            zIndex: 1,
           }}
         />
       </div>
@@ -105,6 +108,15 @@ function CandleDisplay({ currentCandle, lastClosedCandle, scaleMin, scaleMax, ce
 
   if (!currentPositions) {
     return null;
+  }
+
+  // Log candle states (less verbose)
+  if (process.env.NODE_ENV === 'development' && lastClosedCandle) {
+    console.log('🕯️ Candles:', { 
+      hasLast: !!lastClosedPositions, 
+      hasCurrent: !!currentPositions,
+      lastCandle: lastClosedCandle,
+    });
   }
 
   return (

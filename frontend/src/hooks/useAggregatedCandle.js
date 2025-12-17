@@ -28,14 +28,23 @@ export function useAggregatedCandle(ohlcData, timeframeMinutes) {
     const isNewPeriod = currentPeriodStartRef.current !== null && currentPeriodStartRef.current !== periodStart;
     
     if (isNewPeriod) {
+      console.log('🔄 New period detected!', {
+        oldPeriod: new Date(currentPeriodStartRef.current * 1000).toISOString(),
+        newPeriod: new Date(periodStart * 1000).toISOString(),
+        timeframeMinutes,
+      });
+      
       // The previous current candle is now completed
       if (currentCandle) {
+        console.log('✅ Setting last closed candle:', currentCandle);
         setLastClosedCandle(currentCandle);
         completedCandlesRef.current.push(currentCandle);
         // Keep only the last few completed candles
         if (completedCandlesRef.current.length > 10) {
           completedCandlesRef.current.shift();
         }
+      } else {
+        console.log('⚠️ No current candle to close');
       }
       
       // Clear history to start fresh for the new period
