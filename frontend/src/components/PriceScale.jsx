@@ -52,10 +52,15 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
     // Generate tick marks at fixed $increment intervals
     const ticks = [];
     
+    // Calculate a buffer to prevent ticks from overlapping with the edge
+    // Use 0.5% of the total range or one increment, whichever is smaller
+    const edgeBuffer = Math.min(totalRange * 0.005, increment);
+    const effectiveMax = scaleMax - edgeBuffer;
+    
     // Generate ticks from scaleMin to scaleMax at increment intervals
     // Start from scaleMin + increment to avoid the leftmost tick being cut off
-    // End before scaleMax to avoid the rightmost tick being cut off
-    for (let price = scaleMin + increment; price < scaleMax; price += increment) {
+    // End before effectiveMax to avoid the rightmost tick being cut off
+    for (let price = scaleMin + increment; price < effectiveMax; price += increment) {
       // Round to avoid floating point precision issues
       const roundedPrice = Math.round(price * 100) / 100;
       

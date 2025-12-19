@@ -640,9 +640,12 @@ function OrderbookView({ orderbookState, ohlcData }) {
           
           // Generate field lines at fixed increments (matching PriceScale)
           const fieldLines = [];
+          // Calculate a buffer to prevent lines from overlapping with the edge (match PriceScale)
+          const edgeBuffer = Math.min(totalRange * 0.005, increment);
+          const effectiveMax = scaleMax - edgeBuffer;
           // Start from scaleMin + increment to avoid the leftmost line being cut off
-          // End before scaleMax to avoid the rightmost line being cut off (match PriceScale)
-          for (let price = scaleMin + increment; price < scaleMax; price += increment) {
+          // End before effectiveMax to avoid the rightmost line being cut off (match PriceScale)
+          for (let price = scaleMin + increment; price < effectiveMax; price += increment) {
             const roundedPrice = Math.round(price * 100) / 100;
             if (roundedPrice >= minPrice - increment && roundedPrice <= maxPrice + increment) {
               const isCenter = Math.abs(roundedPrice - roundedCenter) < increment / 2;
@@ -682,6 +685,63 @@ function OrderbookView({ orderbookState, ohlcData }) {
               })}
             </>
           );
+        })()}
+        
+        {/* Death Zone - when price scale includes $0 or negative prices */}
+        {scaleRange.scaleMin != null && scaleRange.scaleMax != null && scaleRange.scaleMin < 0 && (() => {
+          const { scaleMin, scaleMax } = scaleRange;
+          const totalRange = scaleMax - scaleMin;
+          
+          const priceToPosition = (price) => {
+            if (totalRange === 0) return 50;
+            return ((price - scaleMin) / totalRange) * 100;
+          };
+          
+          // Calculate position of $0
+          const zeroPosition = priceToPosition(0);
+          
+          // Only show if $0 is actually visible on screen (within bounds)
+          if (zeroPosition >= 0 && zeroPosition <= 100) {
+            return (
+              <>
+                {/* Shaded area to the left of $0 */}
+                <div
+                  className="absolute top-0 bottom-0 death-zone-pattern pointer-events-none z-8"
+                  style={{
+                    left: '0%',
+                    width: `${zeroPosition}%`,
+                  }}
+                />
+                
+                {/* Red line at $0 */}
+                <div
+                  className="absolute top-0 bottom-0 w-1 bg-arcade-red pointer-events-none z-12"
+                  style={{
+                    left: `${zeroPosition}%`,
+                    transform: 'translateX(-50%)',
+                    boxShadow: '0 0 8px rgba(255, 0, 64, 0.8)',
+                  }}
+                />
+                
+                {/* DEATH ZONE text */}
+                <div
+                  className="absolute pointer-events-none z-12"
+                  style={{
+                    left: `${zeroPosition * 0.5}%`,
+                    top: '20%',
+                    transform: 'translateX(-50%)',
+                  }}
+                >
+                  <div className="bg-arcade-dark/90 border-2 border-arcade-red px-4 py-2">
+                    <div className="text-arcade-red text-xl font-arcade font-bold uppercase tracking-wider whitespace-nowrap">
+                      ⚠ DEATH ZONE ⚠
+                    </div>
+                  </div>
+                </div>
+              </>
+            );
+          }
+          return null;
         })()}
         
         {/* Volume icon columns - aligned with price scale ticks */}
