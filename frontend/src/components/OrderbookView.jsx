@@ -494,7 +494,10 @@ function OrderbookView({ orderbookState, ohlcData }) {
     // Calculate volume per icon so that max volume fills ~70% of available space
     // This leaves some headroom and prevents touching the top
     const targetMaxIcons = Math.max(Math.floor(maxIcons * 0.7), 10); // At least 10 icons for max
-    const volPerIcon = max > 0 ? max / targetMaxIcons : 0.1;
+    
+    // Since we're splitting into 2 columns, each icon should represent half the volume
+    // to maintain the same maximum height (2 columns * half volume per icon = same total)
+    const volPerIcon = max > 0 ? max / (targetMaxIcons * 2) : 0.1;
     
     return {
       maxVolume: max,
@@ -677,8 +680,12 @@ function OrderbookView({ orderbookState, ohlcData }) {
         {effectiveLastPrice && minPrice && maxPrice && sortedIntervalEntries.length > 0 && volumePerIcon > 0 && (
           <div key={`volume-columns-${priceIncrement}`}>
             {sortedIntervalEntries.map(([price, { volume, position, isLeft }]) => {
-              // Calculate number of icons based on dynamic scale
-              const iconCount = Math.max(1, Math.floor(volume / volumePerIcon));
+              // Calculate total number of icons based on dynamic scale
+              const totalIconCount = Math.max(2, Math.floor(volume / volumePerIcon));
+              
+              // Split icons into 2 columns: 60% in front (center), 40% in back
+              const frontColumnCount = Math.ceil(totalIconCount * 0.6);
+              const backColumnCount = Math.floor(totalIconCount * 0.4);
               
               // Use full price precision and increment in key to avoid collisions and force reset on increment change
               const columnKey = `col-${priceIncrement}-${price.toFixed(4)}`;
@@ -688,7 +695,7 @@ function OrderbookView({ orderbookState, ohlcData }) {
               
               // Debug log for rendering
               if (process.env.NODE_ENV === 'development') {
-                console.log(`Rendering column at price ${price}, position ${position.toFixed(2)}%, volume ${volume.toFixed(4)}, icons ${iconCount}, volumePerIcon ${volumePerIcon.toFixed(4)}`);
+                console.log(`Rendering columns at price ${price}, position ${position.toFixed(2)}%, volume ${volume.toFixed(4)}, front ${frontColumnCount}, back ${backColumnCount}, volumePerIcon ${volumePerIcon.toFixed(4)}`);
               }
               
               return (
@@ -701,25 +708,63 @@ function OrderbookView({ orderbookState, ohlcData }) {
                     transform: 'translate(-50%, -50%)',
                   }}
                 >
-                  {/* Center icons vertically around the midline, like football players on line of scrimmage */}
-                  <div className="flex flex-col items-center justify-center gap-1">
-                    {Array.from({ length: iconCount }).map((_, i) => (
-                      isLeft ? (
-                        <img
-                          key={`${columnKey}-icon-${i}`}
-                          src={pacManIcon}
-                          alt="buyer"
-                          className={`w-6 h-6 inline-block ${isVictim ? 'dying-icon' : ''}`}
-                        />
-                      ) : (
-                        <img
-                          key={`${columnKey}-icon-${i}`}
-                          src={spaceInvaderIcon}
-                          alt="seller"
-                          className={`w-6 h-6 inline-block ${isVictim ? 'dying-icon' : ''}`}
-                        />
-                      )
-                    ))}
+                  {/* Two columns side by side - order depends on which side of center */}
+                  <div className="flex items-center justify-center gap-1">
+                    {isLeft ? (
+                      // Left side (buyers): back column on left, front column toward center (right)
+                      <>
+                        {/* Back column (further from center) */}
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          {Array.from({ length: backColumnCount }).map((_, i) => (
+                            <img
+                              key={`${columnKey}-back-${i}`}
+                              src={pacManIcon}
+                              alt="buyer"
+                              className={`w-6 h-6 inline-block ${isVictim ? 'dying-icon' : ''}`}
+                            />
+                          ))}
+                        </div>
+                        
+                        {/* Front column (closer to center) */}
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          {Array.from({ length: frontColumnCount }).map((_, i) => (
+                            <img
+                              key={`${columnKey}-front-${i}`}
+                              src={pacManIcon}
+                              alt="buyer"
+                              className={`w-6 h-6 inline-block ${isVictim ? 'dying-icon' : ''}`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    ) : (
+                      // Right side (sellers): front column toward center (left), back column on right
+                      <>
+                        {/* Front column (closer to center) */}
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          {Array.from({ length: frontColumnCount }).map((_, i) => (
+                            <img
+                              key={`${columnKey}-front-${i}`}
+                              src={spaceInvaderIcon}
+                              alt="seller"
+                              className={`w-6 h-6 inline-block ${isVictim ? 'dying-icon' : ''}`}
+                            />
+                          ))}
+                        </div>
+                        
+                        {/* Back column (further from center) */}
+                        <div className="flex flex-col items-center justify-center gap-1">
+                          {Array.from({ length: backColumnCount }).map((_, i) => (
+                            <img
+                              key={`${columnKey}-back-${i}`}
+                              src={spaceInvaderIcon}
+                              alt="seller"
+                              className={`w-6 h-6 inline-block ${isVictim ? 'dying-icon' : ''}`}
+                            />
+                          ))}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               );
