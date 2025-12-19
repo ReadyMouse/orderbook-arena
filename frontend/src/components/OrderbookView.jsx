@@ -279,16 +279,18 @@ function OrderbookView({ orderbookState, ohlcData }) {
     }
 
     const increment = priceIncrement;
+    // Round the last price to the nearest tick mark (this becomes the centerline)
     const roundedCenter = Math.round(effectiveLastPrice / increment) * increment;
     
     // Set to exactly 8 increments per side for consistent scale and readability
     const incrementsPerSide = 8;
     
-    // Center the scale around the ACTUAL effectiveLastPrice, not the rounded version
-    // This ensures the current price (and candle close) is always at exactly 50%
+    // Center the scale around the roundedCenter (tick mark), not the actual price
+    // This ensures the centerline is always at a tick mark (50% position)
+    // The actual lastPrice will move left/right from this centerline
     const rangeHalfWidth = incrementsPerSide * increment;
-    const scaleMin = effectiveLastPrice - rangeHalfWidth;
-    const scaleMax = effectiveLastPrice + rangeHalfWidth;
+    const scaleMin = roundedCenter - rangeHalfWidth;
+    const scaleMax = roundedCenter + rangeHalfWidth;
     
     return { scaleMin, scaleMax, roundedCenter };
   }, [effectiveLastPrice, minPrice, maxPrice, priceIncrement]);
@@ -414,6 +416,11 @@ function OrderbookView({ orderbookState, ohlcData }) {
     return Array.from(intervalVolumes.entries()).sort((a, b) => a[0] - b[0]);
   }, [intervalVolumes]);
 
+  // Reset centerline tracking when price spacing changes
+  useEffect(() => {
+    previousCenterRef.current = null;
+  }, [priceIncrement]);
+
   // Detect when centerline shifts and trigger laser animation
   useEffect(() => {
     if (scaleRange.roundedCenter == null) return;
@@ -421,13 +428,13 @@ function OrderbookView({ orderbookState, ohlcData }) {
     const currentCenter = scaleRange.roundedCenter;
     const prevCenter = previousCenterRef.current;
     
-    // Initialize on first run
+    // Initialize on first run or after price spacing change
     if (prevCenter === null) {
       previousCenterRef.current = currentCenter;
       return;
     }
     
-    // Check if center has shifted
+    // Check if center has shifted (price crossed a tick boundary)
     if (currentCenter !== prevCenter && sortedIntervalEntries.length > 0) {
       // Determine which side won (price moved toward them)
       const priceMovedRight = currentCenter > prevCenter; // Buyers winning (price rising)

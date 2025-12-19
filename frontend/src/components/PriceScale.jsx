@@ -108,18 +108,18 @@ function PriceScale({ lastPrice, minPrice, maxPrice, increment = 10, scaleMin: p
         {/* Main ruler line */}
         <div className="absolute top-1/2 left-0 right-0 h-0.5 bg-arcade-white transform -translate-y-1/2" />
         
-        {/* Current price marker - Yellow line at actual current price position */}
+        {/* Current price marker - Yellow box at actual current price position (moves relative to centerline) */}
         {lastPrice != null && (
           <div 
             className="absolute top-0 bottom-0 transform -translate-x-1/2 z-30"
             style={{ left: `${currentPricePosition}%` }}
           >
-            {/* Yellow center line - only extends above the ruler line */}
+            {/* Yellow line - only extends above the ruler line */}
             <div className="absolute top-0 bottom-1/2 w-0.5 bg-arcade-yellow" />
-            {/* Current price label */}
+            {/* Current price label - always show cents when increment >= 1 */}
             <div className="absolute bottom-1/2 left-1/2 transform -translate-x-1/2 mb-6 whitespace-nowrap">
               <div className={`bg-arcade-yellow text-arcade-bg px-2 py-1 ${currentPriceFontSize} font-arcade font-bold`}>
-                Last Price: ${increment < 1 ? lastPrice.toFixed(2) : lastPrice.toFixed(0)}
+                Last Price: ${lastPrice.toFixed(2)}
               </div>
             </div>
           </div>
