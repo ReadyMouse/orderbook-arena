@@ -614,6 +614,7 @@ function OrderbookView({ orderbookState, ohlcData }) {
             lastClosedCandle={lastClosedCandle}
             scaleMin={scaleRange.scaleMin}
             scaleMax={scaleRange.scaleMax}
+            priceIncrement={priceIncrement}
             centerPrice={effectiveLastPrice}
           />
         )}
