@@ -7,23 +7,46 @@
  * @param {Function} props.onPlay - Callback when play button is clicked
  * @param {Function} props.onPause - Callback when pause button is clicked
  * @param {Function} props.onSpeedChange - Callback when speed is changed (speed: number) => void
+ * @param {Function} props.onLive - Callback when live button is clicked
+ * @param {boolean} props.isLive - Whether currently in live mode
+ * @param {boolean} props.isPlayDisabled - Whether the Play button should be disabled
  */
-function Controls({ isPlaying, playbackSpeed, onPlay, onPause, onSpeedChange }) {
+function Controls({ isPlaying, playbackSpeed, onPlay, onPause, onSpeedChange, onLive, isLive, isPlayDisabled }) {
   const speedOptions = [0.5, 1, 2, 10];
 
   return (
     <div className="flex items-center justify-center gap-4">
-      {/* Play/Pause Button */}
+      {/* Live Button */}
       <button
-        onClick={isPlaying ? onPause : onPlay}
+        onClick={onLive}
         className={`
           px-6 py-3 font-arcade uppercase text-lg
           border-2 shadow-arcade transition-all
-          ${isPlaying 
-            ? 'bg-arcade-red text-arcade-white border-arcade-red hover:bg-arcade-red/80' 
-            : 'bg-arcade-green text-arcade-white border-arcade-green hover:bg-arcade-green/80'
+          ${isLive
+            ? 'bg-arcade-green text-arcade-white border-arcade-green'
+            : 'bg-green-500/30 text-arcade-white border-arcade-green hover:bg-green-500/40'
           }
           active:shadow-none active:translate-x-1 active:translate-y-1
+        `}
+        aria-label="Return to live"
+      >
+        ● LIVE
+      </button>
+
+      {/* Play/Pause Button */}
+      <button
+        onClick={isPlaying ? onPause : onPlay}
+        disabled={isPlayDisabled}
+        className={`
+          px-6 py-3 font-arcade uppercase text-lg
+          border-2 shadow-arcade transition-all
+          ${isPlayDisabled
+            ? 'bg-green-500/30 text-arcade-white border-arcade-gray cursor-not-allowed'
+            : isPlaying 
+              ? 'bg-arcade-red text-arcade-white border-arcade-red hover:bg-arcade-red/80' 
+              : 'bg-green-500/30 text-arcade-white border-arcade-green hover:bg-green-500/40'
+          }
+          ${!isPlayDisabled && 'active:shadow-none active:translate-x-1 active:translate-y-1'}
         `}
         aria-label={isPlaying ? 'Pause' : 'Play'}
       >

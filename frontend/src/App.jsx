@@ -152,6 +152,11 @@ function App() {
       clampedTimestamp = maxTimestamp;
     }
 
+    // If not in time-travel mode, enter it automatically when scrubbing
+    if (!isTimeTravelMode) {
+      enterTimeTravelMode();
+    }
+
     setTimestamp(clampedTimestamp);
     // If not playing, fetch immediately
     if (!isPlaying) {
@@ -160,9 +165,9 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen bg-arcade-bg text-arcade-white">
+    <div className="h-screen bg-arcade-bg text-arcade-white flex flex-col overflow-hidden">
       {/* Header */}
-      <header className="p-4 border-b-2 border-arcade-white relative">
+      <header className="p-4 border-b-2 border-arcade-white relative flex-shrink-0">
         <div className="flex items-center justify-center gap-4 mb-2">
           <h1 className="text-3xl font-arcade uppercase">
             Orderbook Arena:
@@ -231,30 +236,6 @@ function App() {
           </div>
         )}
         
-        {/* Mode toggle - upper right corner */}
-        <div className="absolute top-4 right-4">
-          {!isTimeTravelMode ? (
-            <button
-              onClick={handleEnterTimeTravel}
-              className="px-4 py-2 font-arcade uppercase text-xs
-                         bg-arcade-purple text-arcade-white border-2 border-arcade-purple
-                         shadow-arcade hover:bg-arcade-purple/80
-                         active:shadow-none active:translate-x-1 active:translate-y-1"
-            >
-              ⏱ Time Travel
-            </button>
-          ) : (
-            <button
-              onClick={handleExitTimeTravel}
-              className="px-4 py-2 font-arcade uppercase text-xs
-                         bg-arcade-gray text-arcade-white border-2 border-arcade-gray
-                         shadow-arcade hover:bg-arcade-gray/80
-                         active:shadow-none active:translate-x-1 active:translate-y-1"
-            >
-              ← Return to Live
-            </button>
-          )}
-        </div>
         <div className="flex justify-center items-center gap-4 mt-2">
           <div className={`text-sm ${isTimeTravelMode ? 'text-arcade-yellow' : isConnected ? 'text-arcade-green' : 'text-arcade-red'}`}>
             {isTimeTravelMode ? '⏱ TIME TRAVEL' : isConnected ? '● LIVE' : '○ OFFLINE'}
@@ -274,11 +255,6 @@ function App() {
               ⚠ {snapshotError}
             </div>
           )}
-          {isTimeTravelMode && currentTimestamp === minTimestamp && minTimestamp != null && (
-            <div className="text-sm text-arcade-yellow font-arcade">
-              ⏪ At beginning of history
-            </div>
-          )}
           {isTimeTravelMode && currentTimestamp === maxTimestamp && maxTimestamp != null && (
             <div className="text-sm text-arcade-yellow font-arcade">
               ⏩ At end of history
@@ -292,18 +268,18 @@ function App() {
         </div>
       </header>
 
-      {/* Main visualization area */}
-      <main className="flex-1 p-4">
-        <div className="w-full h-[calc(100vh-200px)] border-2 border-arcade-white">
+      {/* Main visualization area - takes remaining space */}
+      <main className="flex-1 p-4 min-h-0 overflow-hidden">
+        <div className="w-full h-full border-2 border-arcade-white">
           <OrderbookView orderbookState={displayOrderbook} ohlcData={ohlcData} />
         </div>
       </main>
 
       {/* Controls section */}
-      <footer className="p-4 border-t-2 border-arcade-white">
+      <footer className="p-4 border-t-2 border-arcade-white flex-shrink-0">
         <div className="max-w-4xl mx-auto space-y-4">
           {/* Info message for history collection */}
-          {!isTimeTravelMode && (minTimestamp == null || maxTimestamp == null) && (
+          {(minTimestamp == null || maxTimestamp == null) && (
             <div className="flex justify-center">
               <div className="text-xs text-arcade-gray font-arcade">
                 Collecting history... snapshots available in ~10 seconds
@@ -311,27 +287,31 @@ function App() {
             </div>
           )}
 
-          {/* Time-travel controls (only shown in time-travel mode) */}
-          {isTimeTravelMode && (
-            <>
-              {/* Time slider */}
-              <TimeSlider
-                minTimestamp={minTimestamp}
-                maxTimestamp={maxTimestamp}
-                currentTimestamp={currentTimestamp}
-                onChange={handleTimestampChange}
-              />
+          {/* Time slider - always shown */}
+          <TimeSlider
+            minTimestamp={minTimestamp}
+            maxTimestamp={maxTimestamp}
+            currentTimestamp={currentTimestamp}
+            onChange={handleTimestampChange}
+          />
 
-              {/* Playback controls */}
-              <Controls
-                isPlaying={isPlaying}
-                playbackSpeed={playbackSpeed}
-                onPlay={play}
-                onPause={pause}
-                onSpeedChange={setSpeed}
-              />
-            </>
-          )}
+          {/* Playback controls - always shown */}
+          <Controls
+            isPlaying={isPlaying}
+            playbackSpeed={playbackSpeed}
+            onPlay={() => {
+              // Enter time-travel mode if not already in it
+              if (!isTimeTravelMode) {
+                handleEnterTimeTravel();
+              }
+              play();
+            }}
+            onPause={pause}
+            onSpeedChange={setSpeed}
+            onLive={handleExitTimeTravel}
+            isLive={!isTimeTravelMode}
+            isPlayDisabled={!isTimeTravelMode && (currentTimestamp === null || currentTimestamp === maxTimestamp)}
+          />
         </div>
       </footer>
     </div>

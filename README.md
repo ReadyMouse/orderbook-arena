@@ -28,6 +28,10 @@ Traditional orderbook displays are intimidating walls of numbers. This visualize
 - Dynamic centerline tracking last traded price
 - Multiple trading pairs
 
+## Below Zero Dollar DEATH ZONE 
+
+![Screenshot of price scaling including a $0 death zone](images_movies/small_death_zone.png)
+
 ## 🏗️ Architecture
 
 ```

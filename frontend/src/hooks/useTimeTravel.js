@@ -87,10 +87,13 @@ export function useTimeTravel(ticker) {
     setMinTimestamp(min);
     setMaxTimestamp(max);
     // Initialize currentTimestamp to min if not set
-    if (currentTimestamp === null && min !== null) {
-      setCurrentTimestamp(min);
-    }
-  }, [currentTimestamp]);
+    setCurrentTimestamp(prev => {
+      if (prev === null && min !== null) {
+        return min;
+      }
+      return prev;
+    });
+  }, []);
 
   /**
    * Fetch a historical snapshot by timestamp and update the orderbook view

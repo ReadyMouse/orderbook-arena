@@ -20,9 +20,10 @@ function TimeSlider({ minTimestamp, maxTimestamp, currentTimestamp, onChange }) 
   }
 
   // Normalize currentTimestamp to be within range
+  // When currentTimestamp is null (Live Mode), default to maxTimestamp (right side)
   const normalizedTimestamp = Math.max(
     minTimestamp,
-    Math.min(maxTimestamp, currentTimestamp ?? minTimestamp)
+    Math.min(maxTimestamp, currentTimestamp ?? maxTimestamp)
   );
 
   // Calculate slider value (0-100)

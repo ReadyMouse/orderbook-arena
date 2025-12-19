@@ -157,17 +157,17 @@ function CandleDisplay({ currentCandle, lastClosedCandle, scaleMin, scaleMax, pr
     };
   }, [currentCandle, scaleMin, scaleMax]);
   
-  // Last closed candle uses a scale range centered on its close price (rounded to nearest increment)
+  // Last closed candle uses a scale range centered on the midpoint between its high and low
   // This prevents it from moving when the current price moves, but allows repositioning when increment changes
   const lastClosedPositions = useMemo(() => {
     if (!lastClosedCandle || priceIncrement == null) {
       return null;
     }
     
-    // Calculate a scale range centered on the last closed candle's close price
+    // Calculate a scale range centered on the midpoint of high and low (to ensure wicks are visible)
     // Use the same logic as the main scale: round to nearest increment, then 8 increments per side
-    const candleClosePrice = lastClosedCandle.close;
-    const roundedCenter = Math.round(candleClosePrice / priceIncrement) * priceIncrement;
+    const candleMidpoint = (lastClosedCandle.high + lastClosedCandle.low) / 2;
+    const roundedCenter = Math.round(candleMidpoint / priceIncrement) * priceIncrement;
     const incrementsPerSide = 8;
     const rangeHalfWidth = incrementsPerSide * priceIncrement;
     const lastClosedScaleMin = roundedCenter - rangeHalfWidth;
@@ -310,7 +310,7 @@ function CandleDisplay({ currentCandle, lastClosedCandle, scaleMin, scaleMax, pr
   }
 
   return (
-    <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-20">
+    <div className="absolute top-0 left-0 right-0 h-16 pointer-events-none z-30">
       {/* Last closed candle (top half) - slightly transparent */}
       {renderedLastClosedCandle && (
         <div className="absolute top-0 left-0 right-0 h-8">

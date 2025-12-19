@@ -492,15 +492,17 @@ function OrderbookView({ orderbookState, ohlcData }) {
     
     // Calculate how many icons can fit vertically (accounting for icon size and gap)
     // Each icon is ~24px tall (w-6 h-6) + 4px gap (gap-1) = ~28px per icon
-    // Leave some padding at top/bottom (~40px total)
+    // Reserve space for candles at top (64px) and padding at bottom (40px)
     const iconHeight = 28; // pixels per icon including gap
-    const padding = 40;
-    const availableHeight = Math.max(arenaHeight - padding, 200); // Minimum 200px
+    const candleSpace = 64; // pt-16 padding at top
+    const bottomPadding = 40;
+    const reservedSpace = candleSpace + bottomPadding;
+    const availableHeight = Math.max(arenaHeight - reservedSpace, 200); // Minimum 200px
     const maxIcons = Math.floor(availableHeight / iconHeight);
     
-    // Calculate volume per icon so that max volume fills ~70% of available space
-    // This leaves some headroom and prevents touching the top
-    const targetMaxIcons = Math.max(Math.floor(maxIcons * 0.7), 10); // At least 10 icons for max
+    // Calculate volume per icon so that max volume fills ~60% of available space
+    // This leaves more headroom to prevent overflow
+    const targetMaxIcons = Math.max(Math.floor(maxIcons * 0.6), 10); // At least 10 icons for max
     
     // Since we're splitting into 2 columns, each icon should represent half the volume
     // to maintain the same maximum height (2 columns * half volume per icon = same total)
@@ -606,7 +608,7 @@ function OrderbookView({ orderbookState, ohlcData }) {
       </div>
       
       {/* Football Field - unified visualization area */}
-      <div ref={arenaRef} className="relative flex-1 overflow-auto bg-arcade-dark">
+      <div ref={arenaRef} className="relative flex-1 overflow-hidden bg-arcade-dark">
         {/* Candle Display - at the very top, showing both last closed and current candles */}
         {currentCandle && scaleRange.scaleMin != null && scaleRange.scaleMax != null && (
           <CandleDisplay
@@ -619,16 +621,19 @@ function OrderbookView({ orderbookState, ohlcData }) {
           />
         )}
         
-        {/* Show message if no data */}
-        {(!effectiveLastPrice || !minPrice || !maxPrice || minPrice === maxPrice || groupedLevels.length === 0) && (
-          <div className="absolute inset-0 flex items-center justify-center z-30">
-            <div className="text-arcade-gray text-sm font-arcade">
-              {!effectiveLastPrice ? 'Waiting for orderbook data...' : groupedLevels.length === 0 ? 'No orders to display' : 'Calculating positions...'}
+        {/* Playing field area - starts below candles */}
+        <div className="absolute inset-0 top-16">
+          {/* Show message if no data */}
+          {(!effectiveLastPrice || !minPrice || !maxPrice || minPrice === maxPrice || groupedLevels.length === 0) && (
+            <div className="absolute inset-0 flex items-center justify-center z-25">
+              <div className="text-arcade-gray text-sm font-arcade">
+                {!effectiveLastPrice ? 'Waiting for orderbook data...' : groupedLevels.length === 0 ? 'No orders to display' : 'Calculating positions...'}
+              </div>
             </div>
-          </div>
-        )}
-        {/* Football field lines - extending from scale tick marks */}
-        {scaleRange.scaleMin != null && scaleRange.scaleMax != null && (() => {
+          )}
+          
+          {/* Football field lines - extending from scale tick marks */}
+          {scaleRange.scaleMin != null && scaleRange.scaleMax != null && (() => {
           const increment = priceIncrement;
           const { scaleMin, scaleMax, roundedCenter } = scaleRange;
           const totalRange = scaleMax - scaleMin;
@@ -774,15 +779,16 @@ function OrderbookView({ orderbookState, ohlcData }) {
                     left: `${position}%`,
                     top: '50%',
                     transform: 'translate(-50%, -50%)',
+                    maxHeight: '85%', // Conservative limit to prevent overflow
                   }}
                 >
                   {/* Two columns side by side - order depends on which side of center */}
-                  <div className="flex items-center justify-center gap-1">
+                  <div className="flex items-center justify-center gap-1" style={{ maxHeight: '100%', overflow: 'hidden' }}>
                     {isLeft ? (
                       // Left side (buyers): back column on left, front column toward center (right)
                       <>
                         {/* Back column (further from center) */}
-                        <div className="flex flex-col items-center justify-center gap-1">
+                        <div className="flex flex-col items-center justify-center gap-1 overflow-hidden">
                           {Array.from({ length: backColumnCount }).map((_, i) => (
                             <img
                               key={`${columnKey}-back-${i}`}
@@ -794,7 +800,7 @@ function OrderbookView({ orderbookState, ohlcData }) {
                         </div>
                         
                         {/* Front column (closer to center) */}
-                        <div className="flex flex-col items-center justify-center gap-1">
+                        <div className="flex flex-col items-center justify-center gap-1 overflow-hidden">
                           {Array.from({ length: frontColumnCount }).map((_, i) => (
                             <img
                               key={`${columnKey}-front-${i}`}
@@ -809,7 +815,7 @@ function OrderbookView({ orderbookState, ohlcData }) {
                       // Right side (sellers): front column toward center (left), back column on right
                       <>
                         {/* Front column (closer to center) */}
-                        <div className="flex flex-col items-center justify-center gap-1">
+                        <div className="flex flex-col items-center justify-center gap-1 overflow-hidden">
                           {Array.from({ length: frontColumnCount }).map((_, i) => (
                             <img
                               key={`${columnKey}-front-${i}`}
@@ -821,7 +827,7 @@ function OrderbookView({ orderbookState, ohlcData }) {
                         </div>
                         
                         {/* Back column (further from center) */}
-                        <div className="flex flex-col items-center justify-center gap-1">
+                        <div className="flex flex-col items-center justify-center gap-1 overflow-hidden">
                           {Array.from({ length: backColumnCount }).map((_, i) => (
                             <img
                               key={`${columnKey}-back-${i}`}
@@ -863,14 +869,15 @@ function OrderbookView({ orderbookState, ohlcData }) {
           </div>
         )}
         
-        {/* Center line (yard line 50) - prominent */}
-        {effectiveLastPrice && (
-          <div 
-            className="absolute top-0 bottom-0 w-0.5 bg-arcade-yellow z-10"
-            style={{ left: '50%', transform: 'translateX(-50%)' }}
-          />
-        )}
-      </div>
+          {/* Center line (yard line 50) - prominent */}
+          {effectiveLastPrice && (
+            <div 
+              className="absolute top-0 bottom-0 w-0.5 bg-arcade-yellow z-10"
+              style={{ left: '50%', transform: 'translateX(-50%)' }}
+            />
+          )}
+        </div> {/* End playing field area */}
+      </div> {/* End arena */}
       
       {/* Legend - lower left corner */}
       {volumePerIcon > 0 && (
