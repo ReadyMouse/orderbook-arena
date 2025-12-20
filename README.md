@@ -38,6 +38,10 @@ The grid lines of the area can be changed to reflect different price spacing. Th
 
 ![Screenshot of the control bar](images_movies/price_scale.png)
 
+Here you can see the top red candle is the closed candle, and the green candle is the active candle. 
+
+![Screenshot of an example candles](images_movies/candles.png)
+
 ### Lazers! 
 
 The arena centerline is set at the start to the current price, when the price changes such that it croses the next tick mark on either side the grid, it triggers an adjustment. Based on which side put pressure to move the price, that side will fire lazers across to the other side. This is a visual indicator that the centerline price is shifting, and that one side is really pushing the price. 
