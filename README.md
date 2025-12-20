@@ -17,8 +17,6 @@ Traditional orderbook displays are intimidating walls of numbers. This visualize
 
 **Time Travel**: Scrub through history to see how the battle unfolded during pumps, dumps, and sideways chop.
 
-![Screenshots of Time Travel](images_movies/ZEC_time_travel.png)
-
 ## ✨ Features
 
 ### Core (MVP)

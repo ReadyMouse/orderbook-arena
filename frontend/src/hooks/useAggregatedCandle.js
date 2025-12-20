@@ -14,6 +14,7 @@ export function useAggregatedCandle(ohlcData, timeframeMinutes) {
   const completedCandlesRef = useRef([]);
   const lastTimeframeRef = useRef(timeframeMinutes);
   const currentPeriodStartRef = useRef(null);
+  const previousCandleRef = useRef(null); // Store previous candle for closing
   
   useEffect(() => {
     if (!ohlcData) {
@@ -35,10 +36,10 @@ export function useAggregatedCandle(ohlcData, timeframeMinutes) {
       });
       
       // The previous current candle is now completed
-      if (currentCandle) {
-        console.log('✅ Setting last closed candle:', currentCandle);
-        setLastClosedCandle(currentCandle);
-        completedCandlesRef.current.push(currentCandle);
+      if (previousCandleRef.current) {
+        console.log('✅ Setting last closed candle:', previousCandleRef.current);
+        setLastClosedCandle(previousCandleRef.current);
+        completedCandlesRef.current.push(previousCandleRef.current);
         // Keep only the last few completed candles
         if (completedCandlesRef.current.length > 10) {
           completedCandlesRef.current.shift();
@@ -87,8 +88,10 @@ export function useAggregatedCandle(ohlcData, timeframeMinutes) {
       count: candles.reduce((sum, c) => sum + c.count, 0),
     };
     
+    // Store the current candle for next iteration
+    previousCandleRef.current = aggregated;
     setCurrentCandle(aggregated);
-  }, [ohlcData, timeframeMinutes, currentCandle]);
+  }, [ohlcData, timeframeMinutes]);
   
   // Only clear history when timeframe actually changes (not on mount)
   useEffect(() => {
@@ -96,6 +99,7 @@ export function useAggregatedCandle(ohlcData, timeframeMinutes) {
       candleHistoryRef.current = [];
       completedCandlesRef.current = [];
       currentPeriodStartRef.current = null;
+      previousCandleRef.current = null;
       // Don't clear candles - keep showing last candles until new ones arrive
       lastTimeframeRef.current = timeframeMinutes;
     }
