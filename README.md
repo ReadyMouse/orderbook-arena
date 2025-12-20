@@ -17,6 +17,8 @@ Traditional orderbook displays are intimidating walls of numbers. This visualize
 
 **Time Travel**: Scrub through history to see how the battle unfolded during pumps, dumps, and sideways chop.
 
+**Demo Video**: [Watch on YouTube](https://youtu.be/C68x4GK2k-I)
+
 ## ✨ Features
 
 ### Core (MVP)
