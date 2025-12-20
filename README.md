@@ -26,7 +26,37 @@ Traditional orderbook displays are intimidating walls of numbers. This visualize
 - Dynamic centerline tracking last traded price
 - Multiple trading pairs
 
-## Below Zero Dollar DEATH ZONE 
+### Bid-Ask Relative Volume 
+
+In the upper-right hand corner of the screen, there are 2 battery life meters for the Buyer and Sellers that indicate the bid-ask proportions of the total volume.
+
+![Screenshot of the battery life meters](images_movies/relative_volume.png)
+
+### The Price Scale and Candles
+
+The grid lines of the area can be changed to reflect different price spacing. This can be set in the upper control panels. There are also two horizontal candles that show open, close, high, and low prices for the given time interval set on the control panel. There are two stacked candles, the top is the last closed candle and the bottom is the current candle. 
+
+![Screenshot of the control bar](images_movies/price_scale.png)
+
+### Lazers! 
+
+The arena centerline is set at the start to the current price, when the price changes such that it croses the next tick mark on either side the grid, it triggers an adjustment. Based on which side put pressure to move the price, that side will fire lazers across to the other side. This is a visual indicator that the centerline price is shifting, and that one side is really pushing the price. 
+
+![Screenshot of lazer actions](images_movies/screenshot_lazers.png)
+
+### Time Travel 
+
+There is the option for both live and time-travel viewing using the time indicator at the bottom of the screen. It has rewind, pause, play, and LIVE button as well as speed of playback. 
+
+![Screenshot of the time travel replay feature](images_movies/time_travel_bar.png)
+
+### Multiple Pairs 
+
+The demo was recorded with ZEC, but other pairs are available using the dropdown menu at the top of the Orderbook Arena. 
+
+![Screenshot of other pairs available](images_movies/dropdown_ETH.png)
+
+### Below Zero Dollar DEATH ZONE 
 
 ![Screenshot of price scaling including a $0 death zone](images_movies/small_death_zone.png)
 
